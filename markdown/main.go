@@ -5,12 +5,13 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"io"
 	"io/ioutil"
 	"strings"
 
 	"github.com/mattn/go-runewidth"
-	"github.com/russross/blackfriday"
 	"github.com/shurcooL/go/indentwriter"
+	"gopkg.in/russross/blackfriday.v2"
 )
 
 type markdownRenderer struct {
@@ -22,11 +23,13 @@ type markdownRenderer struct {
 
 	// TODO: Clean these up.
 	headers      []string
-	columnAligns []int
+	columnAligns []blackfriday.CellAlignFlags
 	columnWidths []int
 	cells        []string
 
 	opt Options
+
+	buf *bytes.Buffer
 
 	// stringWidth is used internally to calculate visual width of a string.
 	stringWidth func(s string) (width int)
@@ -46,8 +49,8 @@ func formatCode(lang string, text []byte) (formattedCode []byte, ok bool) {
 }
 
 // Block-level callbacks.
-func (_ *markdownRenderer) BlockCode(out *bytes.Buffer, text []byte, lang string) {
-	doubleSpace(out)
+func (mr *markdownRenderer) BlockCode(out *bytes.Buffer, node *blackfriday.Node, lang string) {
+	mr.doubleSpace(out)
 
 	// Parse out the language name.
 	count := 0
@@ -69,16 +72,18 @@ func (_ *markdownRenderer) BlockCode(out *bytes.Buffer, text []byte, lang string
 	}
 	out.WriteString("\n")
 
-	if formattedCode, ok := formatCode(lang, text); ok {
-		out.Write(formattedCode)
+	if formattedCode, ok := formatCode(lang, node.Literal); ok {
+		out.Write(bytes.TrimSpace(formattedCode))
 	} else {
-		out.Write(text)
+		out.Write(bytes.TrimSpace(node.Literal))
 	}
 
-	out.WriteString("```\n")
+	out.WriteString("\n```")
 }
-func (_ *markdownRenderer) BlockQuote(out *bytes.Buffer, text []byte) {
-	doubleSpace(out)
+
+func (mr *markdownRenderer) BlockQuote(out *bytes.Buffer, node *blackfriday.Node) {
+	text := node.Literal
+	mr.doubleSpace(out)
 	lines := bytes.Split(text, []byte("\n"))
 	for i, line := range lines {
 		if i == len(lines)-1 {
@@ -92,87 +97,93 @@ func (_ *markdownRenderer) BlockQuote(out *bytes.Buffer, text []byte) {
 		out.WriteString("\n")
 	}
 }
-func (_ *markdownRenderer) BlockHtml(out *bytes.Buffer, text []byte) {
-	doubleSpace(out)
+
+func (mr *markdownRenderer) BlockHtml(out *bytes.Buffer, node *blackfriday.Node) {
+	text := node.Literal
+	mr.doubleSpace(out)
 	out.Write(text)
 	out.WriteByte('\n')
 }
-func (_ *markdownRenderer) TitleBlock(out *bytes.Buffer, text []byte) {
-}
-func (mr *markdownRenderer) Header(out *bytes.Buffer, text func() bool, level int, id string) {
-	marker := out.Len()
-	doubleSpace(out)
 
-	if level >= 3 {
-		fmt.Fprint(out, strings.Repeat("#", level), " ")
-	}
+func (_ *markdownRenderer) TitleBlock(out *bytes.Buffer, text []byte) {}
 
-	textMarker := out.Len()
-	if !text() {
-		out.Truncate(marker)
+func (mr *markdownRenderer) Header(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
+	if entering {
+		mr.doubleSpace(out)
+		if node.IsTitleblock && node.Level >= 3 {
+			fmt.Fprint(out, strings.Repeat("#", node.Level), " ")
+		} else if !node.IsTitleblock {
+			fmt.Fprint(out, strings.Repeat("#", node.Level), " ")
+		}
 		return
 	}
 
-	switch level {
-	case 1:
-		len := mr.stringWidth(out.String()[textMarker:])
-		fmt.Fprint(out, "\n", strings.Repeat("=", len))
-	case 2:
-		len := mr.stringWidth(out.String()[textMarker:])
-		fmt.Fprint(out, "\n", strings.Repeat("-", len))
+	if node.IsTitleblock {
+		len := mr.stringWidth(out.String())
+		switch node.Level {
+		case 1:
+			fmt.Fprint(out, "\n", strings.Repeat("=", len))
+		case 2:
+			fmt.Fprint(out, "\n", strings.Repeat("-", len))
+		}
 	}
 	out.WriteString("\n")
 }
-func (_ *markdownRenderer) HRule(out *bytes.Buffer) {
-	doubleSpace(out)
-	out.WriteString("---\n")
+
+func (mr *markdownRenderer) HRule() {
+	mr.buf.WriteString("\n---")
 }
-func (mr *markdownRenderer) List(out *bytes.Buffer, text func() bool, flags int) {
-	marker := out.Len()
-	doubleSpace(out)
+
+func (mr *markdownRenderer) List(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
+	if !entering {
+		mr.listDepth--
+		return
+	}
 
 	mr.listDepth++
-	defer func() { mr.listDepth-- }()
-	if flags&blackfriday.LIST_TYPE_ORDERED != 0 {
+	if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
 		mr.orderedListCounter[mr.listDepth] = 1
 	}
-	if !text() {
-		out.Truncate(marker)
-		return
-	}
+	mr.paragraph[mr.listDepth] = !node.Tight
 }
-func (mr *markdownRenderer) ListItem(out *bytes.Buffer, text []byte, flags int) {
-	if flags&blackfriday.LIST_TYPE_ORDERED != 0 {
-		fmt.Fprintf(out, "%d.", mr.orderedListCounter[mr.listDepth])
-		indentwriter.New(out, 1).Write(text)
-		mr.orderedListCounter[mr.listDepth]++
-	} else {
-		out.WriteString("-")
-		indentwriter.New(out, 1).Write(text)
-	}
-	out.WriteString("\n")
-	if mr.paragraph[mr.listDepth] {
-		if flags&blackfriday.LIST_ITEM_END_OF_LIST == 0 {
-			out.WriteString("\n")
+
+func (mr *markdownRenderer) ListItem(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
+	if entering {
+		out.WriteString("\n")
+		if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
+			fmt.Fprintf(out, "%d%v", mr.orderedListCounter[mr.listDepth], node.Delimiter)
+			indentwriter.New(out, mr.listDepth-1).Write(node.Literal)
+			mr.orderedListCounter[mr.listDepth]++
+		} else {
+			indentwriter.New(out, mr.listDepth-1).Write([]byte{node.BulletChar})
 		}
-		mr.paragraph[mr.listDepth] = false
+	} else {
+		if mr.paragraph[mr.listDepth] {
+			if node.ListFlags&blackfriday.ListItemEndOfList == 0 {
+				out.WriteString("EOL\n")
+			}
+		}
 	}
 }
-func (mr *markdownRenderer) Paragraph(out *bytes.Buffer, text func() bool) {
-	marker := out.Len()
-	doubleSpace(out)
 
-	mr.paragraph[mr.listDepth] = true
-
-	if !text() {
-		out.Truncate(marker)
+func (mr *markdownRenderer) Paragraph(out *bytes.Buffer, entering bool) {
+	//text := node.Literal
+	if !mr.paragraph[mr.listDepth] && mr.listDepth != 0 {
 		return
 	}
-	out.WriteString("\n")
+	if entering {
+		mr.doubleSpace(out)
+	} else {
+		out.WriteString("\n")
+	}
 }
 
-func (mr *markdownRenderer) Table(out *bytes.Buffer, header []byte, body []byte, columnData []int) {
-	doubleSpace(out)
+func (mr *markdownRenderer) Table(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
+	//text := node.Literal
+	if entering {
+		mr.doubleSpace(out)
+		return
+	}
 	for column, cell := range mr.headers {
 		out.WriteByte('|')
 		out.WriteByte(' ')
@@ -185,7 +196,7 @@ func (mr *markdownRenderer) Table(out *bytes.Buffer, header []byte, body []byte,
 	out.WriteString("|\n")
 	for column, width := range mr.columnWidths {
 		out.WriteByte('|')
-		if mr.columnAligns[column]&blackfriday.TABLE_ALIGNMENT_LEFT != 0 {
+		if mr.columnAligns[column]&blackfriday.TableAlignmentLeft != 0 {
 			out.WriteByte(':')
 		} else {
 			out.WriteByte('-')
@@ -193,7 +204,7 @@ func (mr *markdownRenderer) Table(out *bytes.Buffer, header []byte, body []byte,
 		for ; width > 0; width-- {
 			out.WriteByte('-')
 		}
-		if mr.columnAligns[column]&blackfriday.TABLE_ALIGNMENT_RIGHT != 0 {
+		if mr.columnAligns[column]&blackfriday.TableAlignmentRight != 0 {
 			out.WriteByte(':')
 		} else {
 			out.WriteByte('-')
@@ -209,12 +220,12 @@ func (mr *markdownRenderer) Table(out *bytes.Buffer, header []byte, body []byte,
 			switch mr.columnAligns[column] {
 			default:
 				fallthrough
-			case blackfriday.TABLE_ALIGNMENT_LEFT:
+			case blackfriday.TableAlignmentLeft:
 				out.Write(cell)
 				for i := mr.stringWidth(string(cell)); i < mr.columnWidths[column]; i++ {
 					out.WriteByte(' ')
 				}
-			case blackfriday.TABLE_ALIGNMENT_CENTER:
+			case blackfriday.TableAlignmentCenter:
 				spaces := mr.columnWidths[column] - mr.stringWidth(string(cell))
 				for i := 0; i < spaces/2; i++ {
 					out.WriteByte(' ')
@@ -223,7 +234,7 @@ func (mr *markdownRenderer) Table(out *bytes.Buffer, header []byte, body []byte,
 				for i := 0; i < spaces-(spaces/2); i++ {
 					out.WriteByte(' ')
 				}
-			case blackfriday.TABLE_ALIGNMENT_RIGHT:
+			case blackfriday.TableAlignmentRight:
 				for i := mr.stringWidth(string(cell)); i < mr.columnWidths[column]; i++ {
 					out.WriteByte(' ')
 				}
@@ -239,15 +250,17 @@ func (mr *markdownRenderer) Table(out *bytes.Buffer, header []byte, body []byte,
 	mr.columnWidths = nil
 	mr.cells = nil
 }
-func (_ *markdownRenderer) TableRow(out *bytes.Buffer, text []byte) {
-}
-func (mr *markdownRenderer) TableHeaderCell(out *bytes.Buffer, text []byte, align int) {
+
+func (mr *markdownRenderer) TableHeaderCell(out *bytes.Buffer, text []byte, align blackfriday.CellAlignFlags) {
+	//text := node.Literal
 	mr.columnAligns = append(mr.columnAligns, align)
 	columnWidth := mr.stringWidth(string(text))
 	mr.columnWidths = append(mr.columnWidths, columnWidth)
 	mr.headers = append(mr.headers, string(text))
 }
-func (mr *markdownRenderer) TableCell(out *bytes.Buffer, text []byte, align int) {
+
+func (mr *markdownRenderer) TableCell(out *bytes.Buffer, text []byte, align blackfriday.CellAlignFlags) {
+	//text := node.Literal
 	columnWidth := mr.stringWidth(string(text))
 	column := len(mr.cells) % len(mr.headers)
 	if columnWidth > mr.columnWidths[column] {
@@ -259,20 +272,26 @@ func (mr *markdownRenderer) TableCell(out *bytes.Buffer, text []byte, align int)
 func (_ *markdownRenderer) Footnotes(out *bytes.Buffer, text func() bool) {
 	out.WriteString("<Footnotes: Not implemented.>") // TODO
 }
+
 func (_ *markdownRenderer) FootnoteItem(out *bytes.Buffer, name, text []byte, flags int) {
 	out.WriteString("<FootnoteItem: Not implemented.>") // TODO
 }
 
 // Span-level callbacks.
 func (_ *markdownRenderer) AutoLink(out *bytes.Buffer, link []byte, kind int) {
+	//text := node.Literal
 	out.Write(escape(link))
 }
+
 func (_ *markdownRenderer) CodeSpan(out *bytes.Buffer, text []byte) {
+	//text := node.Literal
 	out.WriteByte('`')
 	out.Write(text)
 	out.WriteByte('`')
 }
+
 func (mr *markdownRenderer) DoubleEmphasis(out *bytes.Buffer, text []byte) {
+	//text := node.Literal
 	if mr.opt.Terminal {
 		out.WriteString("\x1b[1m") // Bold.
 	}
@@ -283,7 +302,9 @@ func (mr *markdownRenderer) DoubleEmphasis(out *bytes.Buffer, text []byte) {
 		out.WriteString("\x1b[0m") // Reset.
 	}
 }
+
 func (_ *markdownRenderer) Emphasis(out *bytes.Buffer, text []byte) {
+	//text := node.Literal
 	if len(text) == 0 {
 		return
 	}
@@ -291,7 +312,9 @@ func (_ *markdownRenderer) Emphasis(out *bytes.Buffer, text []byte) {
 	out.Write(text)
 	out.WriteByte('*')
 }
+
 func (_ *markdownRenderer) Image(out *bytes.Buffer, link []byte, title []byte, alt []byte) {
+	//text := node.Literal
 	out.WriteString("![")
 	out.Write(alt)
 	out.WriteString("](")
@@ -303,10 +326,13 @@ func (_ *markdownRenderer) Image(out *bytes.Buffer, link []byte, title []byte, a
 	}
 	out.WriteString(")")
 }
+
 func (_ *markdownRenderer) LineBreak(out *bytes.Buffer) {
 	out.WriteString("  \n")
 }
+
 func (_ *markdownRenderer) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
+	//text := node.Literal
 	out.WriteString("[")
 	out.Write(content)
 	out.WriteString("](")
@@ -318,19 +344,26 @@ func (_ *markdownRenderer) Link(out *bytes.Buffer, link []byte, title []byte, co
 	}
 	out.WriteString(")")
 }
+
 func (_ *markdownRenderer) RawHtmlTag(out *bytes.Buffer, tag []byte) {
+	//text := node.Literal
 	out.Write(tag)
 }
+
 func (_ *markdownRenderer) TripleEmphasis(out *bytes.Buffer, text []byte) {
+	//text := node.Literal
 	out.WriteString("***")
 	out.Write(text)
 	out.WriteString("***")
 }
+
 func (_ *markdownRenderer) StrikeThrough(out *bytes.Buffer, text []byte) {
+	//text := node.Literal
 	out.WriteString("~~")
 	out.Write(text)
 	out.WriteString("~~")
 }
+
 func (_ *markdownRenderer) FootnoteRef(out *bytes.Buffer, ref []byte, id int) {
 	out.WriteString("<FootnoteRef: Not implemented.>") // TODO
 }
@@ -376,9 +409,11 @@ func needsEscaping(text []byte, lastNormalText string) bool {
 
 // Low-level callbacks.
 func (_ *markdownRenderer) Entity(out *bytes.Buffer, entity []byte) {
+	//text := node.Literal
 	out.Write(entity)
 }
-func (mr *markdownRenderer) NormalText(out *bytes.Buffer, text []byte) {
+func (mr *markdownRenderer) NormalText(out *bytes.Buffer, node *blackfriday.Node) {
+	text := node.Literal
 	normalText := string(text)
 	if needsEscaping(text, mr.lastNormalText) {
 		text = append([]byte("\\"), text...)
@@ -401,8 +436,8 @@ func (mr *markdownRenderer) NormalText(out *bytes.Buffer, text []byte) {
 }
 
 // Header and footer.
-func (_ *markdownRenderer) DocumentHeader(out *bytes.Buffer) {}
-func (_ *markdownRenderer) DocumentFooter(out *bytes.Buffer) {}
+func (_ *markdownRenderer) RenderHeader(io.Writer, *blackfriday.Node) {}
+func (_ *markdownRenderer) RenderFooter(io.Writer, *blackfriday.Node) {}
 
 func (_ *markdownRenderer) GetFlags() int { return 0 }
 
@@ -433,10 +468,8 @@ func cleanWithoutTrim(s string) string {
 	return string(b)
 }
 
-func doubleSpace(out *bytes.Buffer) {
-	if out.Len() > 0 {
-		out.WriteByte('\n')
-	}
+func (mr *markdownRenderer) doubleSpace(out *bytes.Buffer) {
+	mr.buf.WriteByte('\n')
 }
 
 // terminalStringWidth returns width of s, taking into account possible ANSI escape codes
@@ -455,6 +488,8 @@ func NewRenderer(opt *Options) blackfriday.Renderer {
 		normalTextMarker:   make(map[*bytes.Buffer]int),
 		orderedListCounter: make(map[int]int),
 		paragraph:          make(map[int]bool),
+
+		buf: bytes.NewBuffer(nil),
 
 		stringWidth: runewidth.StringWidth,
 	}
@@ -484,15 +519,19 @@ func Process(filename string, src []byte, opt *Options) ([]byte, error) {
 	}
 
 	// extensions for GitHub Flavored Markdown-like parsing.
-	const extensions = blackfriday.EXTENSION_NO_INTRA_EMPHASIS |
-		blackfriday.EXTENSION_TABLES |
-		blackfriday.EXTENSION_FENCED_CODE |
-		blackfriday.EXTENSION_AUTOLINK |
-		blackfriday.EXTENSION_STRIKETHROUGH |
-		blackfriday.EXTENSION_SPACE_HEADERS |
-		blackfriday.EXTENSION_NO_EMPTY_LINE_BEFORE_BLOCK
+	const extensions = blackfriday.NoIntraEmphasis |
+		blackfriday.Tables |
+		blackfriday.FencedCode |
+		blackfriday.Autolink |
+		blackfriday.Strikethrough |
+		blackfriday.SpaceHeadings |
+		blackfriday.NoEmptyLineBeforeBlock
 
-	output := blackfriday.Markdown(text, NewRenderer(opt), extensions)
+	// output := blackfriday.Markdown(text, NewRenderer(opt), extensions)
+	output := blackfriday.Run(text,
+		blackfriday.WithRenderer(NewRenderer(opt)),
+		blackfriday.WithExtensions(extensions),
+	)
 	return output, nil
 }
 
