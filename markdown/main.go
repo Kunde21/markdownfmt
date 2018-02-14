@@ -27,7 +27,8 @@ type markdownRenderer struct {
 	columnWidths []int
 	cells        []string
 
-	opt Options
+	opt    Options
+	leader [][]byte
 
 	buf *bytes.Buffer
 
@@ -81,7 +82,7 @@ func (mr *markdownRenderer) BlockCode(out *bytes.Buffer, node *blackfriday.Node,
 	out.WriteString("\n```")
 }
 
-func (mr *markdownRenderer) BlockQuote(out *bytes.Buffer, node *blackfriday.Node) {
+func (mr *markdownRenderer) BlockQuote(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
 	text := node.Literal
 	mr.doubleSpace(out)
 	lines := bytes.Split(text, []byte("\n"))
@@ -96,38 +97,43 @@ func (mr *markdownRenderer) BlockQuote(out *bytes.Buffer, node *blackfriday.Node
 		}
 		out.WriteString("\n")
 	}
+	if entering {
+		mr.leader = append(mr.leader, []byte("> "))
+	} else {
+		mr.leader = mr.leader[:len(mr.leader)-1]
+	}
 }
 
 func (mr *markdownRenderer) BlockHtml(out *bytes.Buffer, node *blackfriday.Node) {
 	text := node.Literal
-	mr.doubleSpace(out)
-	out.Write(text)
 	out.WriteByte('\n')
+	out.Write(text)
 }
 
 func (_ *markdownRenderer) TitleBlock(out *bytes.Buffer, text []byte) {}
 
-func (mr *markdownRenderer) Header(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
+func (mr *markdownRenderer) Header(node *blackfriday.Node, entering bool) {
 	if entering {
-		mr.doubleSpace(out)
+		mr.doubleSpace(nil)
 		if node.IsTitleblock && node.Level >= 3 {
-			fmt.Fprint(out, strings.Repeat("#", node.Level), " ")
+			mr.leader = append(mr.leader, append(bytes.Repeat([]byte{'#'}, node.Level), ' '))
 		} else if !node.IsTitleblock {
-			fmt.Fprint(out, strings.Repeat("#", node.Level), " ")
+			mr.leader = append(mr.leader, append(bytes.Repeat([]byte{'#'}, node.Level), ' '))
 		}
 		return
 	}
 
 	if node.IsTitleblock {
-		len := mr.stringWidth(out.String())
+		len := mr.stringWidth(mr.buf.String())
 		switch node.Level {
 		case 1:
-			fmt.Fprint(out, "\n", strings.Repeat("=", len))
+			fmt.Fprint(mr.buf, "\n", strings.Repeat("=", len))
 		case 2:
-			fmt.Fprint(out, "\n", strings.Repeat("-", len))
+			fmt.Fprint(mr.buf, "\n", strings.Repeat("-", len))
 		}
 	}
-	out.WriteString("\n")
+	mr.leader = mr.leader[:len(mr.leader)-1]
+	mr.buf.WriteString("\n")
 }
 
 func (mr *markdownRenderer) HRule() {
@@ -429,6 +435,7 @@ func (mr *markdownRenderer) NormalText(out *bytes.Buffer, node *blackfriday.Node
 	if mr.skipSpaceIfNeededNormalText(out, cleanString) { // Skip first space if last character is already a space (i.e., no need for a 2nd space in a row).
 		cleanString = cleanString[1:]
 	}
+	out.Write(bytes.Join(mr.leader, []byte{}))
 	out.WriteString(cleanString)
 	if len(cleanString) >= 1 && cleanString[len(cleanString)-1] == ' ' { // If it ends with a space, make note of that.
 		mr.normalTextMarker[out] = out.Len()
