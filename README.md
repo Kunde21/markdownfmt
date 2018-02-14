@@ -1,7 +1,9 @@
 markdownfmt
 ===========
 
-[![Build Status](https://travis-ci.org/shurcooL/markdownfmt.svg?branch=master)](https://travis-ci.org/shurcooL/markdownfmt) [![GoDoc](https://godoc.org/github.com/shurcooL/markdownfmt?status.svg)](https://godoc.org/github.com/shurcooL/markdownfmt)
+Fork of github.com/shurcooL/markdownfmt that targets blackfriday v2 to render from parsed markdown AST.  
+
+[![Build Status](https://travis-ci.org/Kunde21/markdownfmt.svg?branch=master)](https://travis-ci.org/Kunde21/markdownfmt) [![GoDoc](https://godoc.org/github.com/Kunde21/markdownfmt?status.svg)](https://godoc.org/github.com/Kunde21/markdownfmt)
 
 Like `gofmt`, but for Markdown.
 
@@ -13,7 +15,7 @@ Installation
 ------------
 
 ```bash
-go get -u github.com/shurcooL/markdownfmt
+go get -u github.com/Kunde21/markdownfmt
 ```
 
 Add `$GOPATH/bin` to your `$PATH` or copy `$GOPATH/bin/markdownfmt` to your `$PATH`.
