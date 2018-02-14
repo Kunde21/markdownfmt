@@ -20,9 +20,9 @@ func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, ente
 	case blackfriday.List:
 		mr.List(mr.buf, node, entering)
 	case blackfriday.Item:
-		mr.ListItem(mr.buf, node, entering)
+		mr.item(mr.buf, node, entering)
 	case blackfriday.Paragraph:
-		mr.Paragraph(mr.buf, entering)
+		mr.paragraph(mr.buf, entering)
 	case blackfriday.Heading:
 		mr.Header(node, entering)
 	case blackfriday.HorizontalRule:
@@ -32,33 +32,33 @@ func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, ente
 	case blackfriday.Del:
 	case blackfriday.Link:
 		children := mr.renderChildren(node)
-		mr.Link(mr.buf, node.Destination, node.Title, children)
+		mr.link(mr.buf, node.Destination, node.Title, children)
 		return blackfriday.SkipChildren
 	case blackfriday.Image:
 	case blackfriday.Text:
 		mr.NormalText(mr.buf, node)
 	case blackfriday.HTMLBlock:
-		mr.RawHtmlTag(mr.buf, node.Literal)
+		mr.BlockHtml(node)
 	case blackfriday.CodeBlock:
 		mr.BlockCode(mr.buf, node, string(node.Info))
 	case blackfriday.Code:
-		mr.CodeSpan(mr.buf, node.Literal)
+		mr.codeSpan(mr.buf, node.Literal)
 	case blackfriday.Softbreak:
 	case blackfriday.Hardbreak:
-		mr.LineBreak(mr.buf)
+		mr.lineBreak(mr.buf)
 	case blackfriday.HTMLSpan:
-		mr.BlockHtml(mr.buf, node)
+		mr.rawHtmlTag(node)
 	case blackfriday.Table:
-		mr.Table(mr.buf, node, entering)
+		mr.table(mr.buf, node, entering)
 	case blackfriday.TableHead:
 	case blackfriday.TableBody:
 	case blackfriday.TableRow:
 	case blackfriday.TableCell:
 		children := mr.renderChildren(node)
 		if node.IsHeader {
-			mr.TableHeaderCell(mr.buf, children, node.Align)
+			mr.tableHeaderCell(mr.buf, children, node.Align)
 		} else {
-			mr.TableCell(mr.buf, children, node.Align)
+			mr.tableCell(mr.buf, children, node.Align)
 		}
 		return blackfriday.SkipChildren
 	default:
