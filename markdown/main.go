@@ -122,6 +122,9 @@ func (mr *markdownRenderer) Header(node *blackfriday.Node, entering bool) {
 		return
 	}
 
+	if node.HeadingID != "" {
+		fmt.Fprintf(mr.buf, " {#%s}", node.HeadingID)
+	}
 	if node.IsTitleblock {
 		len := mr.stringWidth(mr.buf.String())
 		switch node.Level {
