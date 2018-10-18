@@ -9,9 +9,9 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/mattn/go-runewidth"
+	runewidth "github.com/mattn/go-runewidth"
+	blackfriday "github.com/russross/blackfriday/v2"
 	"github.com/shurcooL/go/indentwriter"
-	"gopkg.in/russross/blackfriday.v2"
 )
 
 type markdownRenderer struct {
