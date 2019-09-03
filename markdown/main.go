@@ -113,7 +113,9 @@ func (_ *markdownRenderer) TitleBlock(out *bytes.Buffer, text []byte) {}
 
 func (mr *markdownRenderer) Header(node *blackfriday.Node, entering bool) {
 	if entering {
-		mr.doubleSpace(nil)
+		if node.Prev != nil {
+			mr.doubleSpace(nil)
+		}
 		if node.IsTitleblock && node.Level >= 3 {
 			mr.leader = append(mr.leader, append(bytes.Repeat([]byte{'#'}, node.Level), ' '))
 		} else if !node.IsTitleblock {
