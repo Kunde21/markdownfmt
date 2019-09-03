@@ -9,8 +9,8 @@ import (
 	"io/ioutil"
 	"strings"
 
-	runewidth "github.com/mattn/go-runewidth"
-	blackfriday "github.com/russross/blackfriday/v2"
+	"github.com/mattn/go-runewidth"
+	"github.com/russross/blackfriday/v2"
 	"github.com/shurcooL/go/indentwriter"
 )
 
@@ -113,7 +113,7 @@ func (_ *markdownRenderer) TitleBlock(out *bytes.Buffer, text []byte) {}
 
 func (mr *markdownRenderer) Header(node *blackfriday.Node, entering bool) {
 	if entering {
-		if node.Prev != nil {
+		if node.Prev != nil || node.Parent.Type != blackfriday.Document {
 			mr.doubleSpace(nil)
 		}
 		if node.IsTitleblock && node.Level >= 3 {
