@@ -5,15 +5,12 @@ import (
 	"io"
 	"log"
 
-	blackfriday "github.com/russross/blackfriday/v2"
+	"github.com/russross/blackfriday/v2"
 )
 
 func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
 	switch node.Type {
 	case blackfriday.Document:
-		if !entering {
-			mr.doubleSpace(nil)
-		}
 		break
 	case blackfriday.BlockQuote:
 		mr.BlockQuote(mr.buf, node, entering)
