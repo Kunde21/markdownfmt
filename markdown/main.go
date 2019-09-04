@@ -170,19 +170,23 @@ func (mr *markdownRenderer) item(out *bytes.Buffer, node *blackfriday.Node, ente
 	} else {
 		if mr.listParagraph[mr.listDepth] {
 			if node.ListFlags&blackfriday.ListItemEndOfList == 0 {
-				out.WriteString("EOL\n")
+				out.WriteString("\n")
 			}
 		}
 	}
 }
 
-func (mr *markdownRenderer) paragraph(out *bytes.Buffer, entering bool) {
+func (mr *markdownRenderer) paragraph(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
 	//text := node.Literal
 	if !mr.listParagraph[mr.listDepth] && mr.listDepth != 0 {
 		return
 	}
 	if entering {
-		mr.doubleSpace(out)
+		if node.Parent != nil && node.Parent.Type == blackfriday.Item {
+			out.WriteString(" ")
+		} else {
+			mr.doubleSpace(out)
+		}
 	} else {
 		out.WriteString("\n")
 	}

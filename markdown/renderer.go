@@ -19,7 +19,7 @@ func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, ente
 	case blackfriday.Item:
 		mr.item(mr.buf, node, entering)
 	case blackfriday.Paragraph:
-		mr.paragraph(mr.buf, entering)
+		mr.paragraph(mr.buf, node, entering)
 	case blackfriday.Heading:
 		mr.Header(node, entering)
 	case blackfriday.HorizontalRule:
