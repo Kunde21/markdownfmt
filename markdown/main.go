@@ -149,7 +149,7 @@ func (mr *markdownRenderer) List(out *bytes.Buffer, node *blackfriday.Node, ente
 		mr.listDepth--
 		return
 	}
-
+	out.WriteString("\n")
 	mr.listDepth++
 	if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
 		mr.orderedListCounter[mr.listDepth] = 1
@@ -159,7 +159,6 @@ func (mr *markdownRenderer) List(out *bytes.Buffer, node *blackfriday.Node, ente
 
 func (mr *markdownRenderer) item(out *bytes.Buffer, node *blackfriday.Node, entering bool) {
 	if entering {
-		out.WriteString("\n")
 		if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
 			fmt.Fprintf(out, "%d%v", mr.orderedListCounter[mr.listDepth], node.Delimiter)
 			indentwriter.New(out, mr.listDepth-1).Write(node.Literal)
