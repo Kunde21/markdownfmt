@@ -25,7 +25,13 @@ func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, ente
 	case blackfriday.HorizontalRule:
 		mr.HRule()
 	case blackfriday.Emph:
+		children := mr.renderChildren(node)
+		mr.emphasis(mr.buf, children)
+		return blackfriday.SkipChildren
 	case blackfriday.Strong:
+		children := mr.renderChildren(node)
+		mr.doubleEmphasis(mr.buf, children)
+		return blackfriday.SkipChildren
 	case blackfriday.Del:
 	case blackfriday.Link:
 		children := mr.renderChildren(node)
