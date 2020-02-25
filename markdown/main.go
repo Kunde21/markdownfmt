@@ -302,26 +302,21 @@ func (_ *markdownRenderer) codeSpan(out *bytes.Buffer, text []byte) {
 	out.WriteByte('`')
 }
 
-func (mr *markdownRenderer) doubleEmphasis(out *bytes.Buffer, text []byte) {
-	//text := node.Literal
-	if mr.opt.Terminal {
-		out.WriteString("\x1b[1m") // Bold.
+func (mr *markdownRenderer) doubleEmphasis(out *bytes.Buffer, content []byte) {
+	if len(content) == 0 {
+		return
 	}
 	out.WriteString("**")
-	out.Write(text)
+	out.Write(content)
 	out.WriteString("**")
-	if mr.opt.Terminal {
-		out.WriteString("\x1b[0m") // Reset.
-	}
 }
 
-func (_ *markdownRenderer) emphasis(out *bytes.Buffer, text []byte) {
-	//text := node.Literal
-	if len(text) == 0 {
+func (_ *markdownRenderer) emphasis(out *bytes.Buffer, content []byte) {
+	if len(content) == 0 {
 		return
 	}
 	out.WriteByte('*')
-	out.Write(text)
+	out.Write(content)
 	out.WriteByte('*')
 }
 
