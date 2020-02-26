@@ -13,55 +13,63 @@ func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, ente
 	case blackfriday.Document:
 		break
 	case blackfriday.BlockQuote:
-		mr.BlockQuote(mr.buf, node, entering)
+		mr.BlockQuote(node, entering)
 	case blackfriday.List:
-		mr.List(mr.buf, node, entering)
+		mr.List(node, entering)
 	case blackfriday.Item:
-		mr.item(mr.buf, node, entering)
+		mr.item(node, entering)
 	case blackfriday.Paragraph:
-		mr.paragraph(mr.buf, node, entering)
+		mr.paragraph(node, entering)
 	case blackfriday.Heading:
-		mr.Header(node, entering)
+		children := mr.renderChildren(node)
+		mr.Header(node, children)
+		return blackfriday.SkipChildren
 	case blackfriday.HorizontalRule:
 		mr.HRule()
 	case blackfriday.Emph:
 		children := mr.renderChildren(node)
-		mr.emphasis(mr.buf, children)
+		mr.emphasis(children)
 		return blackfriday.SkipChildren
 	case blackfriday.Strong:
 		children := mr.renderChildren(node)
-		mr.doubleEmphasis(mr.buf, children)
+		mr.doubleEmphasis(children)
 		return blackfriday.SkipChildren
 	case blackfriday.Del:
+		children := mr.renderChildren(node)
+		mr.strikeThrough(children)
+		return blackfriday.SkipChildren
 	case blackfriday.Link:
 		children := mr.renderChildren(node)
-		mr.link(mr.buf, node.Destination, node.Title, children)
+		mr.link(node.Destination, node.Title, children)
 		return blackfriday.SkipChildren
 	case blackfriday.Image:
+		children := mr.renderChildren(node)
+		mr.image(node.Destination, node.Title, children)
+		return blackfriday.SkipChildren
 	case blackfriday.Text:
-		mr.NormalText(mr.buf, node)
+		mr.NormalText(node)
 	case blackfriday.HTMLBlock:
 		mr.BlockHtml(node)
 	case blackfriday.CodeBlock:
-		mr.BlockCode(mr.buf, node, string(node.Info))
+		mr.BlockCode(node, string(node.Info))
 	case blackfriday.Code:
-		mr.codeSpan(mr.buf, node.Literal)
+		mr.codeSpan(node.Literal)
 	case blackfriday.Softbreak:
 	case blackfriday.Hardbreak:
-		mr.lineBreak(mr.buf)
+		mr.lineBreak()
 	case blackfriday.HTMLSpan:
 		mr.rawHtmlTag(node)
 	case blackfriday.Table:
-		mr.table(mr.buf, node, entering)
+		mr.table(node, entering)
 	case blackfriday.TableHead:
 	case blackfriday.TableBody:
 	case blackfriday.TableRow:
 	case blackfriday.TableCell:
 		children := mr.renderChildren(node)
 		if node.IsHeader {
-			mr.tableHeaderCell(mr.buf, children, node.Align)
+			mr.tableHeaderCell(children, node.Align)
 		} else {
-			mr.tableCell(mr.buf, children, node.Align)
+			mr.tableCell(children, node.Align)
 		}
 		return blackfriday.SkipChildren
 	default:
@@ -78,13 +86,15 @@ func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, ente
 }
 
 func (mr *markdownRenderer) renderChildren(node *blackfriday.Node) []byte {
-	buf := mr.buf
+	oldBuf := mr.buf
 	mr.buf = bytes.NewBuffer(nil)
+	resBuf := bytes.NewBuffer(nil)
 	for n := node.FirstChild; n != nil; n = n.Next {
 		n.Walk(func(node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-			return mr.RenderNode(mr.buf, n, entering)
+			return mr.RenderNode(resBuf, node, entering)
 		})
 	}
-	buf, mr.buf = mr.buf, buf
-	return buf.Bytes()
+	mr.buf.WriteTo(resBuf)
+	mr.buf = oldBuf
+	return resBuf.Bytes()
 }
