@@ -114,10 +114,11 @@ func (mr *markdownRenderer) Header(node *blackfriday.Node, text []byte) {
 	}
 
 	newBuf := bytes.NewBuffer(nil)
+	newBuf.Write(text)
 	if node.HeadingID != "" {
 		fmt.Fprintf(newBuf, " {#%s}", node.HeadingID)
 	}
-	newBuf.Write(text)
+
 	slen := mr.stringWidth(newBuf.String())
 
 	newBuf.WriteTo(mr.buf)
@@ -592,12 +593,9 @@ func Process(filename string, src []byte) ([]byte, error) {
 
 	// extensions for GitHub Flavored Markdown-like parsing.
 	const extensions = blackfriday.NoIntraEmphasis |
+		blackfriday.HeadingIDs |
 		blackfriday.Tables |
-		blackfriday.FencedCode |
-		blackfriday.Autolink |
-		blackfriday.Strikethrough |
-		blackfriday.SpaceHeadings |
-		blackfriday.NoEmptyLineBeforeBlock
+		blackfriday.FencedCode
 
 	// output := blackfriday.Markdown(text, NewRenderer(opt), extensions)
 	output := blackfriday.Run(text,
