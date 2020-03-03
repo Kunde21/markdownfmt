@@ -52,8 +52,6 @@ The year was 1986. What a great season.
 
 Now a [link](www.github.com) in a paragraph. End with [link_underscore.go](www.github.com).
 
-Images don't work but we don't care.
-
 -   [Link](www.example.com)
 
 ### An h3 header

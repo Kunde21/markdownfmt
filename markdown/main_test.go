@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Kunde21/markdownfmt/markdown"
+	"github.com/Kunde21/markdownfmt/v2/markdown"
 )
 
 func TestSame(t *testing.T) {
@@ -24,12 +24,12 @@ func TestSame(t *testing.T) {
 			log.Fatalln(err)
 		}
 
-		output, err := markdown.Process("", []byte(reference))
+		output, err := markdown.Process("", reference)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		diff, err := diff([]byte(reference), output)
+		diff, err := diff(reference, output)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -89,8 +89,14 @@ func diff(b1, b2 []byte) (data []byte, err error) {
 	defer os.Remove(f2.Name())
 	defer f2.Close()
 
-	f1.Write(b1)
-	f2.Write(b2)
+	_, err = f1.Write(b1)
+	if err != nil {
+		return
+	}
+	_, err = f2.Write(b2)
+	if err != nil {
+		return
+	}
 
 	data, err = exec.Command("diff", "-u", f1.Name(), f2.Name()).CombinedOutput()
 	if len(data) > 0 {
