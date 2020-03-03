@@ -10,11 +10,16 @@ import (
 	"log"
 	"strings"
 
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	extAst "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/parser"
+
 	"github.com/mattn/go-runewidth"
-	"github.com/russross/blackfriday/v2"
 )
 
-type markdownRenderer struct {
+type MarkdownFmtRenderer struct {
 	normalTextMarker   map[*bytes.Buffer]int
 	orderedListCounter map[int]int
 	listParagraph      map[int]bool // Used to keep track of whether a given list item uses a paragraph for large spacing.
@@ -25,9 +30,11 @@ type markdownRenderer struct {
 
 	// TODO: Clean these up.
 	headers      []string
-	columnAligns []blackfriday.CellAlignFlags
+	columnAligns []extAst.Alignment
 	columnWidths []int
 	cells        []string
+
+	tableIsHeader bool
 
 	buf *bytes.Buffer
 }
@@ -45,17 +52,43 @@ func formatCode(lang string, text []byte) (formattedCode []byte, ok bool) {
 	}
 }
 
-// Block-level callbacks.
-func (mr *markdownRenderer) BlockCode(node *blackfriday.Node, lang string) {
-	// blockcode fails if in list or blockquote because of blackfriday parser bug
-	mr.buf.WriteByte('\n')
-	if mr.blockquoteDepth != 0 {
-		log.Fatal("Do not use codeblocks inside blockquote, broken in blackfriday")
+func rawWrite(writer io.Writer, source []byte) {
+	n := 0
+	l := len(source)
+	for i := 0; i < l; i++ {
+		v := source[i]
+		_, _ = writer.Write(source[i-n : i])
+		n = 0
+		_, _ = writer.Write([]byte{v})
 	}
-	if mr.listDepth != 0 {
-		log.Fatal("Do not use codeblocks inside list, broken in blackfriday")
+	if n != 0 {
+		_, _ = writer.Write(source[l-n:])
 	}
+}
 
+func writeLines(w io.Writer, source []byte, n ast.Node) {
+	l := n.Lines().Len()
+	for i := 0; i < l; i++ {
+		line := n.Lines().At(i)
+		rawWrite(w, line.Value(source))
+	}
+}
+
+// Block-level callbacks.
+func (mr *MarkdownFmtRenderer) blockCode(node ast.Node, source []byte) {
+	//lang := node.
+	// blockcode fails if in list or blockquote because of blackfriday parser bug
+	mr.buf.Write(mr.leader())
+	mr.buf.WriteByte('\n')
+
+	lang := ""
+	tnode, isFenced := node.(*ast.FencedCodeBlock)
+	if isFenced {
+		info := tnode.Info
+		if info != nil {
+			lang = string(info.Text(source))
+		}
+	}
 	// Parse out the language name.
 	count := 0
 	for _, elt := range strings.Fields(lang) {
@@ -65,6 +98,7 @@ func (mr *markdownRenderer) BlockCode(node *blackfriday.Node, lang string) {
 		if len(elt) == 0 {
 			continue
 		}
+		mr.buf.Write(mr.leader())
 		mr.buf.WriteString("```")
 		mr.buf.WriteString(elt)
 		count++
@@ -72,23 +106,32 @@ func (mr *markdownRenderer) BlockCode(node *blackfriday.Node, lang string) {
 	}
 
 	if count == 0 {
+		mr.buf.Write(mr.leader())
 		mr.buf.WriteString("```")
 	}
 	mr.buf.WriteString("\n")
+	mr.buf.Write(mr.leader())
+
+	codeBuf := bytes.NewBuffer(nil)
+	writeLines(codeBuf, source, node)
+	literal := codeBuf.Bytes()
 
 	var code []byte
-	if formattedCode, ok := formatCode(lang, node.Literal); ok {
+	if formattedCode, ok := formatCode(lang, literal); ok {
 		code = formattedCode
 	} else {
-		code = node.Literal
+		code = literal
 	}
+	code = bytes.TrimSpace(code)
+	code = bytes.ReplaceAll(code, []byte{'\n'}, append([]byte{'\n'}, mr.leader()...))
 
-	mr.buf.Write(bytes.TrimSpace(code))
+	mr.buf.Write(code)
 	mr.buf.WriteString("\n")
+	mr.buf.Write(mr.leader())
 	mr.buf.WriteString("```\n")
 }
 
-func (mr *markdownRenderer) BlockQuote(node *blackfriday.Node, entering bool) {
+func (mr *MarkdownFmtRenderer) blockQuote(entering bool) {
 	if entering {
 		mr.blockquoteDepth++
 	} else {
@@ -96,16 +139,29 @@ func (mr *markdownRenderer) BlockQuote(node *blackfriday.Node, entering bool) {
 	}
 }
 
-func (mr *markdownRenderer) BlockHtml(node *blackfriday.Node) {
-	mr.buf.WriteByte('\n')
-	mr.buf.Write(node.Literal)
+func (mr *MarkdownFmtRenderer) rawHtml(node *ast.RawHTML, source []byte) {
+	l := node.Segments.Len()
+	for i := 0; i < l; i++ {
+		segment := node.Segments.At(i)
+		_, _ = mr.buf.Write(segment.Value(source))
+	}
 }
 
-func (_ *markdownRenderer) stringWidth(s string) int {
+func (mr *MarkdownFmtRenderer) blockHtml(node *ast.HTMLBlock, source []byte) {
+	mr.buf.WriteByte('\n')
+
+	l := node.Lines().Len()
+	for i := 0; i < l; i++ {
+		line := node.Lines().At(i)
+		_, _ = mr.buf.Write(line.Value(source))
+	}
+}
+
+func (_ *MarkdownFmtRenderer) stringWidth(s string) int {
 	return runewidth.StringWidth(s)
 }
 
-func (mr *markdownRenderer) Header(node *blackfriday.Node, text []byte) {
+func (mr *MarkdownFmtRenderer) header(node *ast.Heading, text []byte) {
 	mr.spaceBeforeParagraph(node)
 
 	if node.Level >= 3 {
@@ -114,14 +170,16 @@ func (mr *markdownRenderer) Header(node *blackfriday.Node, text []byte) {
 	}
 
 	newBuf := bytes.NewBuffer(nil)
+
 	newBuf.Write(text)
-	if node.HeadingID != "" {
-		fmt.Fprintf(newBuf, " {#%s}", node.HeadingID)
+	id, hasId := node.AttributeString("id")
+	if hasId {
+		fmt.Fprintf(newBuf, " {#%s}", id)
 	}
 
 	slen := mr.stringWidth(newBuf.String())
 
-	newBuf.WriteTo(mr.buf)
+	mr.buf.Write(newBuf.Bytes())
 
 	switch node.Level {
 	case 1:
@@ -137,11 +195,11 @@ func (mr *markdownRenderer) Header(node *blackfriday.Node, text []byte) {
 	mr.buf.WriteString("\n")
 }
 
-func (mr *markdownRenderer) HRule() {
+func (mr *MarkdownFmtRenderer) hrule() {
 	mr.buf.WriteString("\n---\n")
 }
 
-func (mr *markdownRenderer) List(node *blackfriday.Node, entering bool) {
+func (mr *MarkdownFmtRenderer) list(node *ast.List, entering bool) {
 	if !entering {
 		mr.listDepth--
 		mr.listJustExited = true
@@ -151,23 +209,23 @@ func (mr *markdownRenderer) List(node *blackfriday.Node, entering bool) {
 		log.Fatal("list inside blockquote not supported, sorry")
 	}
 	mr.listJustExited = false
-	if mr.listDepth == 0 || !node.Tight {
+	if mr.listDepth == 0 || !node.IsTight {
 		mr.buf.WriteString("\n")
 	}
 	mr.listDepth++
-	if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
+	if node.IsOrdered() {
 		mr.orderedListCounter[mr.listDepth] = 1
 	} else {
 		mr.orderedListCounter[mr.listDepth] = 0
 	}
-	mr.listParagraph[mr.listDepth] = !node.Tight
+	mr.listParagraph[mr.listDepth] = !node.IsTight
 }
 
 // how many spaces to write after item number.
 // unfortunately, blackfriday requires the indent to be 4/8/... spaces
 // otherwise it breaks in random ways
 // blackfriday is not commonmark-compliant; new Hugo already replaced it with new engine
-func (mr *markdownRenderer) spacesAfterItem() []byte {
+func (mr *MarkdownFmtRenderer) spacesAfterItem() []byte {
 	// it's 0 if it's items
 	if mr.orderedListCounter[mr.listDepth] == 0 {
 		return bytes.Repeat([]byte{' '}, 3)
@@ -188,7 +246,7 @@ func (mr *markdownRenderer) spacesAfterItem() []byte {
 
 // spaces before item starts from start of line
 // blackfriday needs each nesting level be at least 4, otherwise it behaves erratically
-func (mr *markdownRenderer) spacesBeforeItem(includeLast bool) []byte {
+func (mr *MarkdownFmtRenderer) spacesBeforeItem(includeLast bool) []byte {
 	counter := mr.listDepth * 4
 	if !includeLast {
 		counter -= 4
@@ -196,7 +254,7 @@ func (mr *markdownRenderer) spacesBeforeItem(includeLast bool) []byte {
 	return bytes.Repeat([]byte{' '}, counter)
 }
 
-func (mr *markdownRenderer) blockquoteMarks() []byte {
+func (mr *MarkdownFmtRenderer) blockquoteMarks() []byte {
 	return blockquotesMarksWithLevel(mr.blockquoteDepth)
 }
 
@@ -205,7 +263,7 @@ func blockquotesMarksWithLevel(level int) []byte {
 }
 
 // leader includes both > and spaces for items
-func (mr *markdownRenderer) leader() []byte {
+func (mr *MarkdownFmtRenderer) leader() []byte {
 	spaces := mr.spacesBeforeItem(true)
 	blockquotes := mr.blockquoteMarks()
 	return append(spaces, blockquotes...)
@@ -213,22 +271,27 @@ func (mr *markdownRenderer) leader() []byte {
 
 // what space to write when we encounter paragraph
 // (including the newlines)
-func (mr *markdownRenderer) spaceBeforeParagraph(node *blackfriday.Node) {
+func (mr *MarkdownFmtRenderer) spaceBeforeParagraph(node ast.Node) {
 	isAfterItem := false
-	if node.Parent != nil && node.Parent.Type == blackfriday.Item && node.Parent.FirstChild == node {
+	par := node.Parent()
+	if par != nil && par.Kind() == ast.KindListItem && par.FirstChild() == node {
 		// spaces after item treated differently
 		mr.buf.Write(mr.spacesAfterItem())
 		isAfterItem = true
 	}
 
+	var gpar ast.Node
+	if par != nil {
+		gpar = par.Parent()
+	}
+
 	// special case - blockquote inside item
-	if node.Parent != nil &&
-		node.Parent.Parent != nil &&
-		node.Type == blackfriday.Paragraph &&
-		node.Parent.Type == blackfriday.BlockQuote &&
-		node.Parent.Parent.Type == blackfriday.Item &&
-		node.Parent.Parent.FirstChild == node.Parent &&
-		node.Parent.FirstChild == node {
+	if gpar != nil &&
+		node.Kind() == ast.KindParagraph &&
+		par.Kind() == ast.KindBlockquote &&
+		gpar.Kind() == ast.KindListItem &&
+		gpar.FirstChild() == par &&
+		par.FirstChild() == node {
 		mr.buf.Write(mr.spacesAfterItem())
 		mr.buf.WriteString("> ")
 		isAfterItem = true
@@ -240,9 +303,10 @@ func (mr *markdownRenderer) spaceBeforeParagraph(node *blackfriday.Node) {
 }
 
 // just newlines before paragraph, when we know we will do a newline
-func (mr *markdownRenderer) newlineBeforeParagraph(node *blackfriday.Node) {
+func (mr *MarkdownFmtRenderer) newlineBeforeParagraph(node ast.Node) {
 	blockquoteDepth := mr.blockquoteDepth
-	if node.Parent != nil && node.Parent.Type == blackfriday.BlockQuote && node.Parent.FirstChild == node {
+	par := node.Parent()
+	if par != nil && par.Kind() == ast.KindBlockquote && par.FirstChild() == node {
 		// space before first blockquote paragraph is with 1 less level
 		blockquoteDepth--
 	}
@@ -258,47 +322,48 @@ func (mr *markdownRenderer) newlineBeforeParagraph(node *blackfriday.Node) {
 
 // recursive function to tell if an item is in the "last branch" of a list
 // to prevent multiple repeated newlines after nested list
-func isLastNested(node *blackfriday.Node) bool {
+func isLastNested(node ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	if node.Type == blackfriday.Item {
-		if node.ListFlags&blackfriday.ListItemEndOfList != 0 {
-			return true
-		}
-	}
-	if node.Parent == nil {
+	par := node.Parent()
+	if par == nil {
 		return false
 	}
-	if node == node.Parent.LastChild {
-		// let's do recursion, it isn't that deep
-		return isLastNested(node.Parent)
+	if node.Kind() == ast.KindList && par.Kind() != ast.KindListItem {
+		return true
 	}
+
+	if par.LastChild() == node {
+		// let's do recursion, it isn't that deep
+		return isLastNested(par)
+	}
+
 	return false
 }
 
-func (mr *markdownRenderer) item(node *blackfriday.Node, entering bool) {
+func (mr *MarkdownFmtRenderer) item(node *ast.ListItem, entering bool, source []byte) {
+	parList := node.Parent().(*ast.List)
+	marker := parList.Marker
 	if entering {
 		mr.buf.Write(mr.blockquoteMarks())
 		spaces := mr.spacesBeforeItem(false)
 		mr.buf.Write(spaces)
-		if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
-			s := fmt.Sprintf("%d%s", mr.orderedListCounter[mr.listDepth], string(node.Delimiter))
+		if parList.IsOrdered() {
+			s := fmt.Sprintf("%d%c", mr.orderedListCounter[mr.listDepth], marker)
 			mr.buf.WriteString(s)
 			mr.orderedListCounter[mr.listDepth]++
 		} else {
-			mr.buf.WriteByte(node.BulletChar)
+			mr.buf.WriteByte(marker)
 		}
-	} else {
-		if mr.listParagraph[mr.listDepth] {
-			if !isLastNested(node) && !mr.listJustExited {
-				mr.buf.WriteString("\n")
-			}
+	} else if mr.listParagraph[mr.listDepth] {
+		if !isLastNested(node) && !mr.listJustExited {
+			mr.buf.WriteString("\n")
 		}
 	}
 }
 
-func (mr *markdownRenderer) paragraph(node *blackfriday.Node, entering bool) {
+func (mr *MarkdownFmtRenderer) paragraph(node ast.Node, entering bool) {
 	if entering {
 		mr.spaceBeforeParagraph(node)
 		return
@@ -307,7 +372,23 @@ func (mr *markdownRenderer) paragraph(node *blackfriday.Node, entering bool) {
 	mr.buf.WriteString("\n")
 }
 
-func (mr *markdownRenderer) table(node *blackfriday.Node, entering bool) {
+func (mr *MarkdownFmtRenderer) tableHeaderCell(text []byte, align extAst.Alignment) {
+	mr.columnAligns = append(mr.columnAligns, align)
+	columnWidth := mr.stringWidth(string(text))
+	mr.columnWidths = append(mr.columnWidths, columnWidth)
+	mr.headers = append(mr.headers, string(text))
+}
+
+func (mr *MarkdownFmtRenderer) tableCell(text []byte) {
+	columnWidth := mr.stringWidth(string(text))
+	column := len(mr.cells) % len(mr.headers)
+	if columnWidth > mr.columnWidths[column] {
+		mr.columnWidths[column] = columnWidth
+	}
+	mr.cells = append(mr.cells, string(text))
+}
+
+func (mr *MarkdownFmtRenderer) table(node *extAst.Table, entering bool) {
 	if entering {
 		mr.spaceBeforeParagraph(node)
 		return
@@ -328,7 +409,8 @@ func (mr *markdownRenderer) table(node *blackfriday.Node, entering bool) {
 	mr.buf.Write(leader)
 	for column, width := range mr.columnWidths {
 		mr.buf.WriteByte('|')
-		if mr.columnAligns[column]&blackfriday.TableAlignmentLeft != 0 {
+		if mr.columnAligns[column] == extAst.AlignLeft ||
+			mr.columnAligns[column] == extAst.AlignCenter {
 			mr.buf.WriteByte(':')
 		} else {
 			mr.buf.WriteByte('-')
@@ -336,7 +418,8 @@ func (mr *markdownRenderer) table(node *blackfriday.Node, entering bool) {
 		for ; width > 0; width-- {
 			mr.buf.WriteByte('-')
 		}
-		if mr.columnAligns[column]&blackfriday.TableAlignmentRight != 0 {
+		if mr.columnAligns[column] == extAst.AlignRight ||
+			mr.columnAligns[column] == extAst.AlignCenter {
 			mr.buf.WriteByte(':')
 		} else {
 			mr.buf.WriteByte('-')
@@ -353,12 +436,12 @@ func (mr *markdownRenderer) table(node *blackfriday.Node, entering bool) {
 			switch mr.columnAligns[column] {
 			default:
 				fallthrough
-			case blackfriday.TableAlignmentLeft:
+			case extAst.AlignLeft:
 				mr.buf.Write(cell)
 				for i := mr.stringWidth(string(cell)); i < mr.columnWidths[column]; i++ {
 					mr.buf.WriteByte(' ')
 				}
-			case blackfriday.TableAlignmentCenter:
+			case extAst.AlignCenter:
 				spaces := mr.columnWidths[column] - mr.stringWidth(string(cell))
 				for i := 0; i < spaces/2; i++ {
 					mr.buf.WriteByte(' ')
@@ -367,7 +450,7 @@ func (mr *markdownRenderer) table(node *blackfriday.Node, entering bool) {
 				for i := 0; i < spaces-(spaces/2); i++ {
 					mr.buf.WriteByte(' ')
 				}
-			case blackfriday.TableAlignmentRight:
+			case extAst.AlignRight:
 				for i := mr.stringWidth(string(cell)); i < mr.columnWidths[column]; i++ {
 					mr.buf.WriteByte(' ')
 				}
@@ -384,53 +467,40 @@ func (mr *markdownRenderer) table(node *blackfriday.Node, entering bool) {
 	mr.cells = nil
 }
 
-func (mr *markdownRenderer) tableHeaderCell(text []byte, align blackfriday.CellAlignFlags) {
-	mr.columnAligns = append(mr.columnAligns, align)
-	columnWidth := mr.stringWidth(string(text))
-	mr.columnWidths = append(mr.columnWidths, columnWidth)
-	mr.headers = append(mr.headers, string(text))
-}
-
-func (mr *markdownRenderer) tableCell(text []byte, align blackfriday.CellAlignFlags) {
-	columnWidth := mr.stringWidth(string(text))
-	column := len(mr.cells) % len(mr.headers)
-	if columnWidth > mr.columnWidths[column] {
-		mr.columnWidths[column] = columnWidth
-	}
-	mr.cells = append(mr.cells, string(text))
-}
-
 // Span-level callbacks.
 
-func (mr *markdownRenderer) codeSpan(text []byte) {
+func (mr *MarkdownFmtRenderer) codeSpan(n *ast.CodeSpan, source []byte) {
 	mr.buf.WriteByte('`')
-	mr.buf.Write(text)
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		segment := c.(*ast.Text).Segment
+		value := segment.Value(source)
+		if bytes.HasSuffix(value, []byte("\n")) {
+			mr.buf.Write(value[:len(value)-1])
+			if c != n.LastChild() {
+				mr.buf.Write([]byte(" "))
+			}
+		} else {
+			mr.buf.Write(value)
+		}
+	}
 	mr.buf.WriteByte('`')
 }
 
-func (mr *markdownRenderer) doubleEmphasis(content []byte) {
+func (mr *MarkdownFmtRenderer) emphasis(node *ast.Emphasis, content []byte) {
 	if len(content) == 0 {
 		return
 	}
-	mr.buf.WriteString("**")
+	str := strings.Repeat("*", node.Level)
+	mr.buf.WriteString(str)
 	mr.buf.Write(content)
-	mr.buf.WriteString("**")
+	mr.buf.WriteString(str)
 }
 
-func (mr *markdownRenderer) emphasis(content []byte) {
-	if len(content) == 0 {
-		return
-	}
-	mr.buf.WriteByte('*')
-	mr.buf.Write(content)
-	mr.buf.WriteByte('*')
-}
-
-func (mr *markdownRenderer) image(link []byte, title []byte, alt []byte) {
+func (mr *MarkdownFmtRenderer) image(link []byte, title []byte, alt []byte) {
 	mr.buf.WriteString("![")
 	mr.buf.Write(alt)
 	mr.buf.WriteString("](")
-	mr.buf.Write(escape(link))
+	mr.buf.Write(link)
 	if len(title) != 0 {
 		mr.buf.WriteString(` "`)
 		mr.buf.Write(title)
@@ -439,18 +509,18 @@ func (mr *markdownRenderer) image(link []byte, title []byte, alt []byte) {
 	mr.buf.WriteString(")")
 }
 
-func (mr *markdownRenderer) lineBreak() {
+func (mr *MarkdownFmtRenderer) lineBreak() {
 	mr.buf.WriteString("  \n")
 
 	spaces := mr.leader()
 	mr.buf.Write(spaces)
 }
 
-func (mr *markdownRenderer) link(link []byte, title []byte, content []byte) {
+func (mr *MarkdownFmtRenderer) link(link []byte, title []byte, content []byte) {
 	mr.buf.WriteString("[")
 	mr.buf.Write(content)
 	mr.buf.WriteString("](")
-	mr.buf.Write(escape(link))
+	mr.buf.Write(link)
 	if len(title) != 0 {
 		mr.buf.WriteString(` "`)
 		mr.buf.Write(title)
@@ -459,22 +529,13 @@ func (mr *markdownRenderer) link(link []byte, title []byte, content []byte) {
 	mr.buf.WriteString(")")
 }
 
-func (mr *markdownRenderer) rawHtmlTag(node *blackfriday.Node) {
-	mr.buf.Write(node.Literal)
-}
-
-func (mr *markdownRenderer) strikeThrough(content []byte) {
+func (mr *MarkdownFmtRenderer) strikeThrough(content []byte) {
 	if len(content) == 0 {
 		return
 	}
 	mr.buf.WriteString("~~")
 	mr.buf.Write(content)
 	mr.buf.WriteString("~~")
-}
-
-// escape replaces instances of backslash with escaped backslash in text.
-func escape(text []byte) []byte {
-	return bytes.Replace(text, []byte(`\`), []byte(`\\`), -1)
 }
 
 func isNumber(data []byte) bool {
@@ -511,10 +572,25 @@ func needsEscaping(text []byte, lastNormalText string) bool {
 	}
 }
 
-// Low-level callbacks.
+func (mr *MarkdownFmtRenderer) string(node *ast.String, source []byte, entering bool) {
+	if !entering {
+		return
+	}
+	// who knows
+	mr.buf.Write(node.Value)
+}
 
-func (mr *markdownRenderer) NormalText(node *blackfriday.Node) {
-	text := node.Literal
+func (mr *MarkdownFmtRenderer) normalText(node *ast.Text, source []byte, entering bool) {
+	if !entering {
+		return
+	}
+	isHardLine := false
+	text := node.Segment.Value(source)
+	if node.HardLineBreak() {
+		isHardLine = true
+	} else if node.SoftLineBreak() {
+		text = append(text, ' ')
+	}
 	normalText := string(text)
 	if needsEscaping(text, mr.lastNormalText) {
 		text = append([]byte("\\"), text...)
@@ -527,6 +603,7 @@ func (mr *markdownRenderer) NormalText(node *blackfriday.Node) {
 	if cleanString == "" {
 		return
 	}
+
 	if mr.skipSpaceIfNeededNormalText(cleanString) { // Skip first space if last character is already a space (i.e., no need for a 2nd space in a row).
 		cleanString = cleanString[1:]
 	}
@@ -535,13 +612,12 @@ func (mr *markdownRenderer) NormalText(node *blackfriday.Node) {
 	if len(cleanString) >= 1 && cleanString[len(cleanString)-1] == ' ' { // If it ends with a space, make note of that.
 		mr.normalTextMarker[mr.buf] = mr.buf.Len()
 	}
+	if isHardLine {
+		mr.lineBreak()
+	}
 }
 
-// Header and footer.
-func (_ *markdownRenderer) RenderHeader(io.Writer, *blackfriday.Node) {}
-func (_ *markdownRenderer) RenderFooter(io.Writer, *blackfriday.Node) {}
-
-func (mr *markdownRenderer) skipSpaceIfNeededNormalText(cleanString string) bool {
+func (mr *MarkdownFmtRenderer) skipSpaceIfNeededNormalText(cleanString string) bool {
 	if cleanString[0] != ' ' {
 		return false
 	}
@@ -568,17 +644,46 @@ func cleanWithoutTrim(s string) string {
 	return string(b)
 }
 
-// NewRenderer returns a Markdown renderer.
-// If opt is nil the defaults are used.
-func NewRenderer() blackfriday.Renderer {
-	mr := &markdownRenderer{
+func NewRenderer() *MarkdownFmtRenderer {
+	return &MarkdownFmtRenderer{
 		normalTextMarker:   make(map[*bytes.Buffer]int),
 		orderedListCounter: make(map[int]int),
 		listParagraph:      make(map[int]bool),
 
 		buf: bytes.NewBuffer(nil),
 	}
-	return mr
+}
+
+func NewParser() parser.Parser {
+	return NewGoldmark().Parser()
+}
+
+func NewGoldmark() goldmark.Markdown {
+	mr := NewRenderer()
+
+	extensions := []goldmark.Extender{
+		extension.Table,
+		extension.Strikethrough,
+		extension.Linkify,
+		extension.TaskList,
+		extension.DefinitionList,
+		extension.Footnote,
+	}
+	parserOptions := []parser.Option{
+		parser.WithAttribute(),
+	}
+
+	gm := goldmark.New(
+		goldmark.WithExtensions(
+			extensions...,
+		),
+		goldmark.WithParserOptions(
+			parserOptions...,
+		),
+	)
+
+	gm.SetRenderer(mr)
+	return gm
 }
 
 // Process formats Markdown.
@@ -590,20 +695,17 @@ func Process(filename string, src []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	gm := NewGoldmark()
+	output := bytes.NewBuffer(nil)
+	err = gm.Convert(text, output)
+	if err != nil {
+		return nil, err
+	} else {
+		return output.Bytes(), nil
 
-	// extensions for GitHub Flavored Markdown-like parsing.
-	const extensions = blackfriday.NoIntraEmphasis |
-		blackfriday.HeadingIDs |
-		blackfriday.Tables |
-		blackfriday.FencedCode
-
-	// output := blackfriday.Markdown(text, NewRenderer(opt), extensions)
-	output := blackfriday.Run(text,
-		blackfriday.WithRenderer(NewRenderer()),
-		blackfriday.WithExtensions(extensions),
-	)
-	// cuts newline because we sometimes output more newlines
-	return bytes.TrimLeft(output, "\n"), nil
+		// cuts newline because we sometimes output more newlines
+		//return bytes.TrimLeft(output, "\n"), nil
+	}
 }
 
 // If src != nil, readSource returns src.

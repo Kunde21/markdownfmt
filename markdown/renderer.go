@@ -1,100 +1,147 @@
+// Package renderer renders the given AST to certain formats.
 package markdown
 
 import (
 	"bytes"
 	"io"
-	"log"
 
-	"github.com/russross/blackfriday/v2"
+	"github.com/yuin/goldmark/ast"
+	extAst "github.com/yuin/goldmark/extension/ast"
+
+	"github.com/yuin/goldmark/renderer"
 )
 
-func (mr *markdownRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-	switch node.Type {
-	case blackfriday.Document:
+func (mr *MarkdownFmtRenderer) RenderSingle(writer *bytes.Buffer, source []byte, n ast.Node, entering bool) ast.WalkStatus {
+
+	switch tnode := n.(type) {
+	case *ast.Document:
 		break
-	case blackfriday.BlockQuote:
-		mr.BlockQuote(node, entering)
-	case blackfriday.List:
-		mr.List(node, entering)
-	case blackfriday.Item:
-		mr.item(node, entering)
-	case blackfriday.Paragraph:
-		mr.paragraph(node, entering)
-	case blackfriday.Heading:
-		children := mr.renderChildren(node)
-		mr.Header(node, children)
-		return blackfriday.SkipChildren
-	case blackfriday.HorizontalRule:
-		mr.HRule()
-	case blackfriday.Emph:
-		children := mr.renderChildren(node)
-		mr.emphasis(children)
-		return blackfriday.SkipChildren
-	case blackfriday.Strong:
-		children := mr.renderChildren(node)
-		mr.doubleEmphasis(children)
-		return blackfriday.SkipChildren
-	case blackfriday.Del:
-		children := mr.renderChildren(node)
-		mr.strikeThrough(children)
-		return blackfriday.SkipChildren
-	case blackfriday.Link:
-		children := mr.renderChildren(node)
-		mr.link(node.Destination, node.Title, children)
-		return blackfriday.SkipChildren
-	case blackfriday.Image:
-		children := mr.renderChildren(node)
-		mr.image(node.Destination, node.Title, children)
-		return blackfriday.SkipChildren
-	case blackfriday.Text:
-		mr.NormalText(node)
-	case blackfriday.HTMLBlock:
-		mr.BlockHtml(node)
-	case blackfriday.CodeBlock:
-		mr.BlockCode(node, string(node.Info))
-	case blackfriday.Code:
-		mr.codeSpan(node.Literal)
-	case blackfriday.Softbreak:
-	case blackfriday.Hardbreak:
-		mr.lineBreak()
-	case blackfriday.HTMLSpan:
-		mr.rawHtmlTag(node)
-	case blackfriday.Table:
-		mr.table(node, entering)
-	case blackfriday.TableHead:
-	case blackfriday.TableBody:
-	case blackfriday.TableRow:
-	case blackfriday.TableCell:
-		children := mr.renderChildren(node)
-		if node.IsHeader {
-			mr.tableHeaderCell(children, node.Align)
-		} else {
-			mr.tableCell(children, node.Align)
+	case *ast.TextBlock:
+		mr.paragraph(tnode, entering)
+	case *ast.Paragraph:
+		mr.paragraph(tnode, entering)
+	case *ast.Heading:
+		if entering {
+			children := mr.renderChildren(source, n)
+			mr.header(tnode, children)
 		}
-		return blackfriday.SkipChildren
+		return ast.WalkSkipChildren
+	case *ast.Text:
+		mr.normalText(tnode, source, entering)
+	case *ast.String:
+		mr.string(tnode, source, entering)
+	case *ast.CodeSpan:
+		if entering {
+			mr.codeSpan(tnode, source)
+		}
+		return ast.WalkSkipChildren
+	case *extAst.Strikethrough:
+		if entering {
+			children := mr.renderChildren(source, n)
+			mr.strikeThrough(children)
+		}
+		return ast.WalkSkipChildren
+	case *ast.Emphasis:
+		if entering {
+			children := mr.renderChildren(source, n)
+			mr.emphasis(tnode, children)
+		}
+		return ast.WalkSkipChildren
+	case *ast.ThematicBreak:
+		if entering {
+			mr.hrule()
+		}
+	case *ast.Blockquote:
+		mr.blockQuote(entering)
+	case *ast.List:
+		mr.list(tnode, entering)
+	case *ast.ListItem:
+		mr.item(tnode, entering, source)
+	case *ast.Link:
+		if entering {
+			children := mr.renderChildren(source, n)
+			mr.link(tnode.Destination, tnode.Title, children)
+		}
+		return ast.WalkSkipChildren
+	case *ast.Image:
+		if entering {
+			children := mr.renderChildren(source, n)
+			mr.image(tnode.Destination, tnode.Title, children)
+		}
+		return ast.WalkSkipChildren
+	case *ast.CodeBlock:
+		if entering {
+			mr.blockCode(tnode, source)
+		}
+	case *ast.FencedCodeBlock:
+		if entering {
+			mr.blockCode(tnode, source)
+		}
+	case *ast.HTMLBlock:
+		if entering {
+			mr.blockHtml(tnode, source)
+		}
+	case *ast.RawHTML:
+		if entering {
+			mr.rawHtml(tnode, source)
+		}
+		return ast.WalkSkipChildren
+	case *extAst.Table:
+		mr.table(tnode, entering)
+	case *extAst.TableHeader:
+		if entering {
+			mr.tableIsHeader = true
+		}
+	case *extAst.TableRow:
+		if entering {
+			mr.tableIsHeader = false
+		}
+	case *extAst.TableCell:
+		if entering {
+			children := mr.renderChildren(source, n)
+			if mr.tableIsHeader {
+				mr.tableHeaderCell(children, tnode.Alignment)
+			} else {
+				mr.tableCell(children)
+			}
+		}
+		return ast.WalkSkipChildren
 	default:
-		panic("unknown node type")
+		panic("unknown type" + n.Kind().String())
 	}
+
 	if !entering {
-		_, err := mr.buf.WriteTo(w)
-		if err != nil {
-			log.Println(err)
-		}
+		mr.buf.WriteTo(writer)
 		mr.buf.Reset()
+		mr.buf = bytes.NewBuffer(nil)
 	}
-	return blackfriday.GoToNext
+
+	return ast.WalkContinue
 }
 
-func (mr *markdownRenderer) renderChildren(node *blackfriday.Node) []byte {
+func (mr *MarkdownFmtRenderer) renderChildren(source []byte, node ast.Node) []byte {
 	oldBuf := mr.buf
 	mr.buf = bytes.NewBuffer(nil)
+	mr.normalTextMarker = map[*bytes.Buffer]int{}
 	resBuf := bytes.NewBuffer(nil)
-	for n := node.FirstChild; n != nil; n = n.Next {
-		n.Walk(func(node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-			return mr.RenderNode(resBuf, node, entering)
+	for n := node.FirstChild(); n != nil; n = n.NextSibling() {
+		ast.Walk(n, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+			return mr.RenderSingle(resBuf, source, n, entering), nil
 		})
 	}
-	mr.buf.WriteTo(resBuf)
+	resBuf.Write(mr.buf.Bytes())
 	mr.buf = oldBuf
 	return resBuf.Bytes()
+}
+
+// Render renders the given AST node to the given writer with the given Renderer.
+func (mr *MarkdownFmtRenderer) Render(w io.Writer, source []byte, n ast.Node) error {
+	resBuf := mr.renderChildren(source, n)
+	resBuf = bytes.TrimLeft(resBuf, "\n")
+	_, err := w.Write(resBuf)
+	return err
+}
+
+func (mr *MarkdownFmtRenderer) AddOptions(...renderer.Option) {
+	panic("aa")
 }

@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Kunde21/markdownfmt/markdown"
+	"github.com/Kunde21/markdownfmt/v2/markdown"
 )
 
 var (
@@ -41,7 +41,7 @@ func isMarkdownFile(f os.FileInfo) bool {
 	return !f.IsDir() && !strings.HasPrefix(name, ".") && (strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown"))
 }
 
-func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error {
+func processFile(filename string, in io.Reader, out io.Writer) error {
 	if in == nil {
 		f, err := os.Open(filename)
 		if err != nil {
@@ -78,7 +78,10 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 				return fmt.Errorf("computing diff: %s", err)
 			}
 			fmt.Printf("diff %s markdownfmt/%s\n", filename, filename)
-			out.Write(data)
+			_, err = out.Write(data)
+			if err != nil {
+				return fmt.Errorf("writing out: %s", err)
+			}
 		}
 	}
 
@@ -91,7 +94,7 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 
 func visitFile(path string, f os.FileInfo, err error) error {
 	if err == nil && isMarkdownFile(f) {
-		err = processFile(path, nil, os.Stdout, false)
+		err = processFile(path, nil, os.Stdout)
 	}
 	if err != nil {
 		report(err)
@@ -99,8 +102,8 @@ func visitFile(path string, f os.FileInfo, err error) error {
 	return nil
 }
 
-func walkDir(path string) {
-	filepath.Walk(path, visitFile)
+func walkDir(path string) error {
+	return filepath.Walk(path, visitFile)
 }
 
 func main() {
@@ -116,7 +119,7 @@ func markdownfmtMain() {
 	flag.Parse()
 
 	if flag.NArg() == 0 {
-		if err := processFile("<standard input>", os.Stdin, os.Stdout, true); err != nil {
+		if err := processFile("<standard input>", os.Stdin, os.Stdout); err != nil {
 			report(err)
 		}
 		return
@@ -128,9 +131,11 @@ func markdownfmtMain() {
 		case err != nil:
 			report(err)
 		case dir.IsDir():
-			walkDir(path)
+			if err := walkDir(path); err != nil {
+				report(err)
+			}
 		default:
-			if err := processFile(path, nil, os.Stdout, false); err != nil {
+			if err := processFile(path, nil, os.Stdout); err != nil {
 				report(err)
 			}
 		}
@@ -152,8 +157,15 @@ func diff(b1, b2 []byte) (data []byte, err error) {
 	defer os.Remove(f2.Name())
 	defer f2.Close()
 
-	f1.Write(b1)
-	f2.Write(b2)
+	_, err = f1.Write(b1)
+	if err != nil {
+		return
+	}
+
+	_, err = f2.Write(b2)
+	if err != nil {
+		return
+	}
 
 	data, err = exec.Command("diff", "-u", f1.Name(), f2.Name()).CombinedOutput()
 	if len(data) > 0 {

@@ -4,6 +4,12 @@ Itemized lists look like:
 -   that one
 -   the other one
 
+Or with stars
+
+*   this one
+*   that one
+*   the other one
+
 Nothing to note here.
 
 1.  Item 1
