@@ -662,15 +662,11 @@ func NewGoldmark() goldmark.Markdown {
 	mr := NewRenderer()
 
 	extensions := []goldmark.Extender{
-		extension.Table,
-		extension.Strikethrough,
-		extension.Linkify,
-		extension.TaskList,
-		extension.DefinitionList,
-		extension.Footnote,
+		extension.Table,         // we need this to enable | tables |
+		extension.Strikethrough, // we need this to enable ~~strike~~
 	}
 	parserOptions := []parser.Option{
-		parser.WithAttribute(),
+		parser.WithAttribute(), // we need this to enable # headers {#custom-ids}
 	}
 
 	gm := goldmark.New(
