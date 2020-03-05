@@ -160,4 +160,6 @@ Useful for writing poems.
 
 [https://path\to\page](https://path\\to\\page)
 
+Links in Markdown are not changed, like http://google.com
+
 Done.
