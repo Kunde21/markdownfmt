@@ -33,19 +33,19 @@ usage: markdownfmt [flags] [path ...]
 Editor Plugins
 --------------
 
--   [vim-markdownfmt](https://github.com/moorereason/vim-markdownfmt) for Vim.
--   [emacs-markdownfmt](https://github.com/nlamirault/emacs-markdownfmt) for Emacs.
--   Built-in in Conception.
--   [markdown-format](https://atom.io/packages/markdown-format) for Atom (deprecated).
--   Add a plugin for your favorite editor here?
+- [vim-markdownfmt](https://github.com/moorereason/vim-markdownfmt) for Vim.
+- [emacs-markdownfmt](https://github.com/nlamirault/emacs-markdownfmt) for Emacs.
+- Built-in in Conception.
+- [markdown-format](https://atom.io/packages/markdown-format) for Atom (deprecated).
+- Add a plugin for your favorite editor here?
 
 Alternatives
 ------------
 
--   [`mdfmt`](https://github.com/moorereason/mdfmt) - Fork of `markdownfmt` that adds front matter support.
--   [`tidy-markdown`](https://github.com/slang800/tidy-markdown) - Project with similar goals, but written in JS and based on a slightly different [styleguide](https://github.com/slang800/markdown-styleguide).
+- [`mdfmt`](https://github.com/moorereason/mdfmt) - Fork of `markdownfmt` that adds front matter support.
+- [`tidy-markdown`](https://github.com/slang800/tidy-markdown) - Project with similar goals, but written in JS and based on a slightly different [styleguide](https://github.com/slang800/markdown-styleguide).
 
 License
 -------
 
--   [MIT License](https://opensource.org/licenses/mit-license.php)
+- [MIT License](https://opensource.org/licenses/mit-license.php)

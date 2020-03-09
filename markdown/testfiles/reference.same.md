@@ -7,12 +7,12 @@ Paragraphs are separated by a blank line.
 
 Trying items.
 
-1.  Item 1
-2.  Item 2
-    1.  Item 2a
-        -   Item 2aa
-    2.  Item 2b
-3.  Item 3
+1. Item 1
+2. Item 2
+   1. Item 2a
+      - Item 2aa
+   2. Item 2b
+3. Item 3
 
 > Block quotes are written like so.
 >
@@ -27,8 +27,8 @@ Last paragraph here.
 An h2 header
 ------------
 
--   Paragraph right away.
--   **Big item**: Right away after header.
+- Paragraph right away.
+- **Big item**: Right away after header.
 
 [Visit GitHub!](www.github.com)
 
@@ -52,15 +52,15 @@ The year was 1986. What a great season.
 
 Now a [link](www.github.com) in a paragraph. End with [link_underscore.go](www.github.com).
 
--   [Link](www.example.com)
+- [Link](www.example.com)
 
 ### An h3 header
 
 Here's a numbered list:
 
-1.  first item
-2.  second item
-3.  third item
+1. first item
+2. second item
+3. third item
 
 Code block
 
@@ -106,46 +106,46 @@ Nested Lists
 
 ### Codeblock within list
 
--   Code block in list does not work reliably
+- Code block in list does not work reliably
 
 Para
 
 ### Blockquote within list
 
--   list1
+- list1
 
-    > This a quote within a list.
-    >
-    > Still going  
-    > with broken line
+  > This a quote within a list.
+  >
+  > Still going  
+  > with broken line
 
 ### Table within list
 
--   list1
+- list1
 
-    | Header One | Header Two |
-    |------------|------------|
-    | Item One   | Item Two   |
+  | Header One | Header Two |
+  |------------|------------|
+  | Item One   | Item Two   |
 
 ### Multi-level nested
 
--   Item 1
+- Item 1
 
-    Another paragraph inside this list item is indented just like the previous paragraph.
+  Another paragraph inside this list item is indented just like the previous paragraph.
 
--   Item 2
+- Item 2
 
-    -   Item 2a
+  - Item 2a
 
-        Things go here.
+    Things go here.
 
-        > This a quote within a list.
+    > This a quote within a list.
 
-        And they stay here.
+    And they stay here.
 
-    -   Item 2b
+  - Item 2b
 
--   Item 3
+- Item 3
 
 Line Breaks
 ===========

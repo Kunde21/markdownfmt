@@ -55,9 +55,9 @@ Paragraph
 
 Paragraph
 
-1.  [a href](google.com)
-2.  [a href](google.com)
-3.  [a href](google.com)
+1. [a href](google.com)
+2. [a href](google.com)
+3. [a href](google.com)
 
 Paragraph
 
@@ -73,44 +73,53 @@ Paragraph
 
 List can have things inside
 
-1.  List
+1. List
 
-2.  Subtable
+2. Subtable
 
-    | table | two |
-    |-------|-----|
-    | table | thr |
+   | table | two |
+   |-------|-----|
+   | table | thr |
 
-3.  | table | two |
-    |-------|-----|
-    | table | thr |
+3. | table | two |
+   |-------|-----|
+   | table | thr |
 
-4.  | table      | two |
-    |------------|-----|
-    | i *tab* le | thr |
+4. | table      | two |
+   |------------|-----|
+   | i *tab* le | thr |
 
-5.  > blockquote
-    >
-    > will this work? :D
-    >
-    > does not seem so
-    >
-    > > why not
+5. > blockquote
+   >
+   > will this work? :D
+   >
+   > does not seem so
+   >
+   > > why not
 
-6.  Header
-    ======
+6. Header
+   ======
 
-7.  Text can have
+7. Text can have
 
-    Header
-    ======
+   Header
+   ======
 
-    or
+   or
 
-    ### header
+   ### header
 
-    paragraph
+   paragraph
 
-8.  `code` but not rich one (breaks parser)
+8. `code` or rich one like so
+
+   ```C
+   #include <stdio.h>
+   int main() {
+      // printf() displays the string inside quotation
+      printf("Hello, World!");
+      return 0;
+   }
+   ```
 
 fin
