@@ -5,8 +5,8 @@ This is a new paragraph. I wonder if I have too many spaces. What about new para
 
 Is really new.
 
-1.  Item one.
-2.  Item TWO.
+1. Item one.
+2. Item TWO.
 
 Title
 =====

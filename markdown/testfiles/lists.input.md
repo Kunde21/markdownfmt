@@ -47,10 +47,10 @@ Untight, uncollapsed line:
 
 Nested tight:
 
-1. tight
-   1. one
-   2. two
-   3. three
+1.   tight
+     1.   one
+     2.   two
+     3.   three
 2. tight
    1. one
    2. two
@@ -92,14 +92,15 @@ Nested:
 6. 6
 7. 7
 8. 8
-9. 9
+9.    9
 10. 10
 11. 11
     - now 
     - I 
-    - need
-    - more
-    - spaces for nesting
+12.   might
+      1.  need
+      2.   more
+      3.  spaces for nesting
 
 Spacing:
 

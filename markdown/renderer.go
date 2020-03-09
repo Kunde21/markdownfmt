@@ -12,7 +12,6 @@ import (
 )
 
 func (mr *MarkdownFmtRenderer) RenderSingle(writer *bytes.Buffer, source []byte, n ast.Node, entering bool) ast.WalkStatus {
-
 	switch tnode := n.(type) {
 	case *ast.Document:
 		break

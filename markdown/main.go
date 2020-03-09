@@ -76,10 +76,7 @@ func writeLines(w io.Writer, source []byte, n ast.Node) {
 
 // Block-level callbacks.
 func (mr *MarkdownFmtRenderer) blockCode(node ast.Node, source []byte) {
-	//lang := node.
-	// blockcode fails if in list or blockquote because of blackfriday parser bug
-	mr.buf.Write(mr.leader())
-	mr.buf.WriteByte('\n')
+	mr.spaceBeforeParagraph(node)
 
 	lang := ""
 	tnode, isFenced := node.(*ast.FencedCodeBlock)
@@ -98,7 +95,6 @@ func (mr *MarkdownFmtRenderer) blockCode(node ast.Node, source []byte) {
 		if len(elt) == 0 {
 			continue
 		}
-		mr.buf.Write(mr.leader())
 		mr.buf.WriteString("```")
 		mr.buf.WriteString(elt)
 		count++
@@ -106,7 +102,6 @@ func (mr *MarkdownFmtRenderer) blockCode(node ast.Node, source []byte) {
 	}
 
 	if count == 0 {
-		mr.buf.Write(mr.leader())
 		mr.buf.WriteString("```")
 	}
 	mr.buf.WriteString("\n")
@@ -206,6 +201,9 @@ func (mr *MarkdownFmtRenderer) list(node *ast.List, entering bool) {
 		return
 	}
 	if mr.blockquoteDepth > 0 {
+		// not supported because I am lazy, not for any other reason
+		// I just suppose that if blockquote and list at same time -> list first
+		// FIXME: will need redesign of blockquoteDepth/list handling if we really want this
 		log.Fatal("list inside blockquote not supported, sorry")
 	}
 	mr.listJustExited = false
@@ -222,36 +220,31 @@ func (mr *MarkdownFmtRenderer) list(node *ast.List, entering bool) {
 }
 
 // how many spaces to write after item number.
-// unfortunately, blackfriday requires the indent to be 4/8/... spaces
-// otherwise it breaks in random ways
-// blackfriday is not commonmark-compliant; new Hugo already replaced it with new engine
 func (mr *MarkdownFmtRenderer) spacesAfterItem() []byte {
-	// it's 0 if it's items
-	if mr.orderedListCounter[mr.listDepth] == 0 {
-		return bytes.Repeat([]byte{' '}, 3)
-	}
-
-	// counter is always 1 bigger
-	counter := mr.orderedListCounter[mr.listDepth] - 1
-
-	// let's count how long the string is
-	counterString := fmt.Sprintf("%d", counter)
-	lenCounter := len(counterString)
-
-	// 4 for "tabs", - length, minus dot
-	spaceCount := 4 - (lenCounter + 1)
-
-	return bytes.Repeat([]byte{' '}, spaceCount)
+	return []byte{' '}
 }
 
 // spaces before item starts from start of line
-// blackfriday needs each nesting level be at least 4, otherwise it behaves erratically
 func (mr *MarkdownFmtRenderer) spacesBeforeItem(includeLast bool) []byte {
-	counter := mr.listDepth * 4
+	max := mr.listDepth
 	if !includeLast {
-		counter -= 4
+		max--
 	}
-	return bytes.Repeat([]byte{' '}, counter)
+	spaceCount := 0
+	for i := 1; i <= max; i++ {
+		if mr.orderedListCounter[i] == 0 {
+			spaceCount += 2
+		} else {
+			// counter is always 1 bigger
+			counter := mr.orderedListCounter[i] - 1
+			// let's count how long the string is
+			counterString := fmt.Sprintf("%d", counter)
+			lenCounter := len(counterString)
+			spaceCount += lenCounter
+			spaceCount += 2
+		}
+	}
+	return bytes.Repeat([]byte{' '}, spaceCount)
 }
 
 func (mr *MarkdownFmtRenderer) blockquoteMarks() []byte {
@@ -698,9 +691,6 @@ func Process(filename string, src []byte) ([]byte, error) {
 		return nil, err
 	} else {
 		return output.Bytes(), nil
-
-		// cuts newline because we sometimes output more newlines
-		//return bytes.TrimLeft(output, "\n"), nil
 	}
 }
 
