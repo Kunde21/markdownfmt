@@ -1,7 +1,7 @@
 markdownfmt
 ===========
 
-Fork of github.com/shurcooL/markdownfmt that targets blackfriday v2 to render from parsed markdown AST.
+Fork of github.com/shurcooL/markdownfmt that targets goldmark to render from parsed markdown AST.
 
 [![Build Status](https://travis-ci.org/Kunde21/markdownfmt.svg?branch=master)](https://travis-ci.org/Kunde21/markdownfmt) [![GoDoc](https://godoc.org/github.com/Kunde21/markdownfmt?status.svg)](https://godoc.org/github.com/Kunde21/markdownfmt)
 
