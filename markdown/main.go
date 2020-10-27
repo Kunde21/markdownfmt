@@ -159,10 +159,8 @@ func (_ *MarkdownFmtRenderer) stringWidth(s string) int {
 func (mr *MarkdownFmtRenderer) header(node *ast.Heading, text []byte) {
 	mr.spaceBeforeParagraph(node)
 
-	if node.Level >= 3 {
-		mr.buf.Write(bytes.Repeat([]byte{'#'}, node.Level))
-		mr.buf.WriteByte(' ')
-	}
+	mr.buf.Write(bytes.Repeat([]byte{'#'}, node.Level))
+	mr.buf.WriteByte(' ')
 
 	newBuf := bytes.NewBuffer(nil)
 
@@ -172,21 +170,7 @@ func (mr *MarkdownFmtRenderer) header(node *ast.Heading, text []byte) {
 		fmt.Fprintf(newBuf, " {#%s}", id)
 	}
 
-	slen := mr.stringWidth(newBuf.String())
-
 	mr.buf.Write(newBuf.Bytes())
-
-	switch node.Level {
-	case 1:
-		mr.buf.WriteByte('\n')
-		mr.buf.Write(mr.leader())
-		mr.buf.Write(bytes.Repeat([]byte{'='}, slen))
-	case 2:
-		mr.buf.WriteByte('\n')
-		mr.buf.Write(mr.leader())
-		mr.buf.Write(bytes.Repeat([]byte{'-'}, slen))
-	}
-
 	mr.buf.WriteString("\n")
 }
 

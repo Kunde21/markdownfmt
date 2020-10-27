@@ -1,5 +1,4 @@
-An h1 header
-============
+# An h1 header
 
 Paragraphs are separated by a blank line.
 
@@ -24,8 +23,7 @@ Trying items.
 
 Last paragraph here.
 
-An h2 header
-------------
+## An h2 header
 
 - Paragraph right away.
 - **Big item**: Right away after header.
@@ -101,8 +99,7 @@ The outer pipes (|) are optional, and you don't need to make the raw Markdown li
 | *Still*  | `renders` | **nicely** |
 | 1        | 2         | 3          |
 
-Nested Lists
-============
+# Nested Lists
 
 ### Codeblock within list
 
@@ -147,8 +144,7 @@ Para
 
 - Item 3
 
-Line Breaks
-===========
+# Line Breaks
 
 Some text with two trailing spaces for linebreak.  
 More text immediately after.  
