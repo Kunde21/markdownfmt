@@ -80,30 +80,20 @@ func (mr *MarkdownFmtRenderer) blockCode(node ast.Node, source []byte) {
 
 	lang := ""
 	tnode, isFenced := node.(*ast.FencedCodeBlock)
-	if isFenced {
-		info := tnode.Info
-		if info != nil {
-			lang = string(info.Text(source))
+	mr.buf.WriteString("```")
+	if isFenced && tnode.Info != nil {
+		mr.buf.Write(tnode.Info.Text(source))
+
+		for _, elt := range strings.Fields(lang) {
+			elt = strings.TrimSpace(strings.TrimLeft(elt, ". "))
+			if len(elt) == 0 {
+				continue
+			}
+			lang = elt
+			break
 		}
-	}
-	// Parse out the language name.
-	count := 0
-	for _, elt := range strings.Fields(lang) {
-		if elt[0] == '.' {
-			elt = elt[1:]
-		}
-		if len(elt) == 0 {
-			continue
-		}
-		mr.buf.WriteString("```")
-		mr.buf.WriteString(elt)
-		count++
-		break
 	}
 
-	if count == 0 {
-		mr.buf.WriteString("```")
-	}
 	mr.buf.WriteString("\n")
 	mr.buf.Write(mr.leader())
 

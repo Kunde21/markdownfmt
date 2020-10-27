@@ -76,6 +76,14 @@ func main() {
 }
 ```
 
+With language and some tags.
+
+```Go some tags = whatever, but should be preserved.
+func main() {
+	println("Hi.")
+}
+```
+
 Here's a table.
 
 | Name  | Age |
