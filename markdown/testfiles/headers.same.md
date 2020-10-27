@@ -1,52 +1,39 @@
-Header
-======
+# Header
 
-Hea *de* r
-==========
+# Hea *de* r
 
-Hea `de` r
-==========
+# Hea `de` r
 
-Header
-------
+## Header
 
 text
 
-Header
-======
+# Header
 
-Header
-------
+## Header
 
 ### Header
 
 text
 
-Header
-======
+# Header
 
-Header
-======
+# Header
 
-Header {#custom}
-================
+# Header {#custom}
 
 ### Header {#custom}
 
 > quote
 >
-> Header
-> ======
+> # Header
 >
-> Header
-> ------
+> ## Header
 
 Paragraph
 
-> Header
-> ======
+> # Header
 >
-> Header {#custom}
-> ----------------
+> ## Header {#custom}
 >
 > ### Header {#custom}

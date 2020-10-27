@@ -97,13 +97,11 @@ List can have things inside
    >
    > > why not
 
-6. Header
-   ======
+6. # Header
 
 7. Text can have
 
-   Header
-   ======
+   # Header
 
    or
 
