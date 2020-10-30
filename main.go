@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Kunde21/markdownfmt/v2/markdown"
+	"github.com/Kunde21/markdownfmt/v2/markdownfmt"
 )
 
 var (
@@ -56,7 +56,7 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 		return err
 	}
 
-	res, err := markdown.Process(filename, src)
+	res, err := markdownfmt.Process(filename, src)
 	if err != nil {
 		return err
 	}
