@@ -72,7 +72,6 @@ Nested:
    2. two
    3. three
 2. untight
-
    1. one
 
    2. two
@@ -85,6 +84,7 @@ Nested:
 4. more nested
    - coffee
      - beer
+
 5. 4
 6. 5
 7. 6
