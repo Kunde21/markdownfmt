@@ -15,12 +15,14 @@ import (
 )
 
 var (
-	newLineChar        = []byte{'\n'}
-	spaceChar          = []byte{' '}
-	strikeThroughChars = []byte("~~")
-	thematicBreakChars = []byte("---")
-	blockquoteChars    = []byte{'>', ' '}
-	codeBlockChars     = []byte("```")
+	newLineChar             = []byte{'\n'}
+	spaceChar               = []byte{' '}
+	strikeThroughChars      = []byte("~~")
+	thematicBreakChars      = []byte("---")
+	blockquoteChars         = []byte{'>', ' '}
+	codeBlockChars          = []byte("```")
+	tableHeaderColChar      = []byte{'-'}
+	tableHeaderAlignColChar = []byte{':'}
 )
 
 // Ensure compatibility with Goldmark parser.
@@ -70,7 +72,7 @@ func (mr *Renderer) Render(w io.Writer, source []byte, node ast.Node) error {
 func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering && node.PreviousSibling() != nil {
 		switch node.(type) {
-		// All Block types (except few) usually have 2x new lines if not first in siblings.
+		// All Block types (except few) usually have 2x new lines before itself when they are non-first siblings.
 		case *ast.Paragraph, *ast.Heading, *ast.FencedCodeBlock,
 			*ast.CodeBlock, *ast.ThematicBreak, *extAST.Table,
 			*ast.Blockquote, *ast.HTMLBlock:
@@ -82,6 +84,8 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 				_, _ = r.w.Write(newLineChar)
 			}
 		case *ast.ListItem:
+			// TODO(bwplotka): Handle tight/loose rule explicitly.
+			// See: https://github.github.com/gfm/#loose
 			if node.HasBlankPreviousLines() {
 				_, _ = r.w.Write(newLineChar)
 			}
@@ -90,22 +94,23 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 
 	switch tnode := node.(type) {
 	case *ast.Document:
-		if !entering {
-			_, _ = r.w.Write(newLineChar)
+		if entering {
+			break
 		}
+
+		_, _ = r.w.Write(newLineChar)
 
 	// Spans, meaning no newlines before or after.
 	case *ast.Text:
 		if entering {
-
 			text := tnode.Segment.Value(r.source)
 			clean := cleanWithoutTrim(text)
 			if len(clean) == 0 {
 				// Nothing to render.
-				return ast.WalkContinue, nil
+				break
 			}
 			_, _ = r.w.Write(clean)
-			return ast.WalkContinue, nil
+			break
 		}
 
 		if tnode.SoftLineBreak() {
@@ -123,8 +128,9 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *ast.CodeSpan:
 		if entering {
 			_, _ = r.w.Write([]byte{'`'})
-			return ast.WalkContinue, nil
+			break
 		}
+
 		_, _ = r.w.Write([]byte{'`'})
 	case *extAST.Strikethrough:
 		return r.wrapNonEmptyContentWith(strikeThroughChars, entering), nil
@@ -133,8 +139,9 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *ast.Link:
 		if entering {
 			r.w.AddIndentOnFirstWrite([]byte("["))
-			return ast.WalkContinue, nil
+			break
 		}
+
 		_, _ = fmt.Fprintf(r.w, "](%s", tnode.Destination)
 		if len(tnode.Title) > 0 {
 			_, _ = fmt.Fprintf(r.w, ` "%s"`, tnode.Title)
@@ -143,20 +150,23 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *ast.Image:
 		if entering {
 			r.w.AddIndentOnFirstWrite([]byte("!["))
-			return ast.WalkContinue, nil
+			break
 		}
+
 		_, _ = fmt.Fprintf(r.w, "](%s", tnode.Destination)
 		if len(tnode.Title) > 0 {
 			_, _ = fmt.Fprintf(r.w, ` "%s"`, tnode.Title)
 		}
 		_, _ = r.w.Write([]byte{')'})
 	case *ast.RawHTML:
-		if entering {
-			l := tnode.Segments.Len()
-			for i := 0; i < l; i++ {
-				segment := tnode.Segments.At(i)
-				_, _ = r.w.Write(segment.Value(r.source))
-			}
+		if !entering {
+			break
+		}
+
+		l := tnode.Segments.Len()
+		for i := 0; i < l; i++ {
+			segment := tnode.Segments.At(i)
+			_, _ = r.w.Write(segment.Value(r.source))
 		}
 
 	// Blocks.
@@ -168,7 +178,7 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 		if entering {
 			_, _ = r.w.Write(bytes.Repeat([]byte{'#'}, tnode.Level))
 			_, _ = r.w.Write(spaceChar)
-			return ast.WalkContinue, nil
+			break
 		}
 
 		id, hasId := node.AttributeString("id")
@@ -176,54 +186,59 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			_, _ = fmt.Fprintf(r.w, " {#%s}", id)
 		}
 	case *ast.HTMLBlock:
-		if entering {
-			_, _ = r.w.Write(newLineChar)
-			return ast.WalkContinue, nil
+		if !entering {
+			break
 		}
+
+		_, _ = r.w.Write(newLineChar)
 	case *ast.CodeBlock, *ast.FencedCodeBlock:
-		if entering {
-			_, _ = r.w.Write(codeBlockChars)
-
-			var lang []byte
-			if fencedNode, isFenced := node.(*ast.FencedCodeBlock); isFenced && fencedNode.Info != nil {
-				lang = fencedNode.Info.Text(r.source)
-				_, _ = r.w.Write(lang)
-				for _, elt := range bytes.Fields(lang) {
-					elt = bytes.TrimSpace(bytes.TrimLeft(elt, ". "))
-					if len(elt) == 0 {
-						continue
-					}
-					lang = elt
-					break
-				}
-			}
-
-			_, _ = r.w.Write(newLineChar)
-			codeBuf := bytes.Buffer{}
-			for i := 0; i < tnode.Lines().Len(); i++ {
-				line := tnode.Lines().At(i)
-				_, _ = codeBuf.Write(line.Value(r.source))
-			}
-
-			switch noAllocString(lang) {
-			case "Go", "go":
-				gofmt, err := format.Source(codeBuf.Bytes())
-				if err != nil {
-					return ast.WalkStop, err
-				}
-				_, _ = r.w.Write(gofmt)
-
-			default:
-				_, _ = r.w.Write(codeBuf.Bytes())
-			}
-
-			_, _ = r.w.Write(codeBlockChars)
-			return ast.WalkSkipChildren, nil
+		if !entering {
+			break
 		}
+
+		_, _ = r.w.Write(codeBlockChars)
+
+		var lang []byte
+		if fencedNode, isFenced := node.(*ast.FencedCodeBlock); isFenced && fencedNode.Info != nil {
+			lang = fencedNode.Info.Text(r.source)
+			_, _ = r.w.Write(lang)
+			for _, elt := range bytes.Fields(lang) {
+				elt = bytes.TrimSpace(bytes.TrimLeft(elt, ". "))
+				if len(elt) == 0 {
+					continue
+				}
+				lang = elt
+				break
+			}
+		}
+
+		_, _ = r.w.Write(newLineChar)
+		codeBuf := bytes.Buffer{}
+		for i := 0; i < tnode.Lines().Len(); i++ {
+			line := tnode.Lines().At(i)
+			_, _ = codeBuf.Write(line.Value(r.source))
+		}
+
+		switch noAllocString(lang) {
+		case "Go", "go":
+			gofmt, err := format.Source(codeBuf.Bytes())
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			_, _ = r.w.Write(gofmt)
+
+		default:
+			_, _ = r.w.Write(codeBuf.Bytes())
+		}
+
+		_, _ = r.w.Write(codeBlockChars)
+		return ast.WalkSkipChildren, nil
 	case *ast.ThematicBreak:
-		if entering {
-			_, _ = r.w.Write(thematicBreakChars)
+		if !entering {
+			break
 		}
+
+		_, _ = r.w.Write(thematicBreakChars)
 	case *ast.Blockquote:
 		r.w.UpdateIndent(tnode, entering)
 
@@ -236,22 +251,23 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *ast.ListItem:
 		if entering {
 			_, _ = r.w.Write(listItemMarkerChars(tnode))
-		} else {
-			if tnode.NextSibling() != nil && tnode.NextSibling().Kind() == ast.KindListItem {
-				_, _ = r.w.Write(newLineChar)
-			}
+		} else if tnode.NextSibling() != nil && tnode.NextSibling().Kind() == ast.KindListItem {
+			// Newline after list item.
+			_, _ = r.w.Write(newLineChar)
 		}
 		r.w.UpdateIndent(tnode, entering)
 
 	case *extAST.Table:
-		if entering {
-			// Render it straight away. No nested tables are supported and we expect
-			// tables to have limited content, so limit WALK.
-			if err := r.renderTable(tnode); err != nil {
-				return ast.WalkStop, errors.Wrap(err, "rendering table")
-			}
-			return ast.WalkSkipChildren, nil
+		if !entering {
+			break
 		}
+
+		// Render it straight away. No nested tables are supported and we expect
+		// tables to have limited content, so limit WALK.
+		if err := r.renderTable(tnode); err != nil {
+			return ast.WalkStop, errors.Wrap(err, "rendering table")
+		}
+		return ast.WalkSkipChildren, nil
 	case *extAST.TableCell:
 		break
 	case *extAST.TableRow, *extAST.TableHeader:
@@ -290,42 +306,8 @@ func listItemMarkerChars(tnode *ast.ListItem) []byte {
 	return []byte{parList.Marker, spaceChar[0]}
 }
 
-func needsEscaping(text []byte, lastNormalText string) bool {
-	switch string(text) {
-	case `\`,
-		"`",
-		"*",
-		"_",
-		"{", "}",
-		"[", "]",
-		"(", ")",
-		"#",
-		"+",
-		"-":
-		return true
-	case "!":
-		return false
-	case ".":
-		// Return true if number, because a period after a number must be escaped to not get parsed as an ordered list.
-		return isNumber([]byte(lastNormalText))
-	case "<", ">":
-		return true
-	default:
-		return false
-	}
-}
-
 func noAllocString(buf []byte) string {
 	return *(*string)(unsafe.Pointer(&buf))
-}
-
-func isNumber(data []byte) bool {
-	for _, b := range data {
-		if b < '0' || b > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 // cleanWithoutTrim is like clean, but doesn't trim blanks.

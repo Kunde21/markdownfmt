@@ -77,25 +77,31 @@ Nested:
    2. two
 
    3. three
+3. untight with space
 
-3. more nested
+   1. one
+
+   2. two
+
+   3. three
+4. more nested
    1. baz
       - inside
-4. more nested
+5. more nested
    - coffee
      - beer
 
-5. 4
-6. 5
-7. 6
-8. 7
-9. 8
-10. 9
-11. 10
-12. 11
+6. 4
+7. 5
+8. 6
+9. 7
+10. 8
+11. 9
+12. 10
+13. 11
     - now
     - I
-13. might
+14. might
     1. need
     2. more
     3. spaces for nesting
