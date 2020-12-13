@@ -61,71 +61,73 @@ func (r *render) renderTable(node *extAST.Table) error {
 				if entering {
 					colIndex = 0
 					_, _ = r.w.Write(newLineChar)
-				} else {
-					_, _ = r.w.Write([]byte("|"))
+					break
 				}
+
+				_, _ = r.w.Write([]byte("|"))
 			case *extAST.TableHeader:
 				if entering {
 					colIndex = 0
-				} else {
-					_, _ = r.w.Write([]byte("|\n"))
-					for i, align := range columnAligns {
-						width := columnWidths[i]
-						_, _ = r.w.Write([]byte{'|'})
-						if align == extAST.AlignLeft ||
-							align == extAST.AlignCenter {
-							_, _ = r.w.Write([]byte{':'})
-						} else {
-							_, _ = r.w.Write([]byte{'-'})
-						}
-						for ; width > 0; width-- {
-							_, _ = r.w.Write([]byte{'-'})
-						}
-						if align == extAST.AlignRight ||
-							align == extAST.AlignCenter {
-							_, _ = r.w.Write([]byte{':'})
-						} else {
-							_, _ = r.w.Write([]byte{'-'})
-						}
-					}
-					_, _ = r.w.Write([]byte("|"))
+					break
 				}
-			case *extAST.TableCell:
-				if entering {
-					width := columnWidths[colIndex]
-					align := columnAligns[colIndex]
 
-					if tnode.Parent().Kind() == extAST.KindTableHeader {
-						align = extAST.AlignLeft
-					}
+				_, _ = r.w.Write([]byte("|\n"))
+				for i, align := range columnAligns {
+					_, _ = r.w.Write([]byte{'|'})
+					width := columnWidths[i]
 
-					cellBuf.Reset()
-					if err := ast.Walk(tnode, r.mr.newRender(&cellBuf, r.source).renderNode); err != nil {
-						return ast.WalkStop, err
-					}
-
-					_, _ = r.w.Write([]byte("| "))
-					whitespaceWidth := width - runewidth.StringWidth(cellBuf.String())
+					left, right := tableHeaderColChar, tableHeaderColChar
 					switch align {
-					default:
-						fallthrough
 					case extAST.AlignLeft:
-						_, _ = r.w.Write(cellBuf.Bytes())
-						_, _ = r.w.Write(bytes.Repeat([]byte{' '}, 1+whitespaceWidth))
-					case extAST.AlignCenter:
-						first := whitespaceWidth / 2
-						_, _ = r.w.Write(bytes.Repeat([]byte{' '}, first))
-						_, _ = r.w.Write(cellBuf.Bytes())
-						_, _ = r.w.Write(bytes.Repeat([]byte{' '}, whitespaceWidth-first))
-						_, _ = r.w.Write([]byte{' '})
+						left = tableHeaderAlignColChar
 					case extAST.AlignRight:
-						_, _ = r.w.Write(bytes.Repeat([]byte{' '}, whitespaceWidth))
-						_, _ = r.w.Write(cellBuf.Bytes())
-						_, _ = r.w.Write([]byte{' '})
+						right = tableHeaderAlignColChar
+					case extAST.AlignCenter:
+						left, right = tableHeaderAlignColChar, tableHeaderAlignColChar
 					}
-					colIndex++
-					return ast.WalkSkipChildren, nil
+					_, _ = r.w.Write(left)
+					_, _ = r.w.Write(bytes.Repeat(tableHeaderColChar, width))
+					_, _ = r.w.Write(right)
 				}
+				_, _ = r.w.Write([]byte("|"))
+			case *extAST.TableCell:
+				if !entering {
+					break
+				}
+
+				width := columnWidths[colIndex]
+				align := columnAligns[colIndex]
+
+				if tnode.Parent().Kind() == extAST.KindTableHeader {
+					align = extAST.AlignLeft
+				}
+
+				cellBuf.Reset()
+				if err := ast.Walk(tnode, r.mr.newRender(&cellBuf, r.source).renderNode); err != nil {
+					return ast.WalkStop, err
+				}
+
+				_, _ = r.w.Write([]byte("| "))
+				whitespaceWidth := width - runewidth.StringWidth(cellBuf.String())
+				switch align {
+				default:
+					fallthrough
+				case extAST.AlignLeft:
+					_, _ = r.w.Write(cellBuf.Bytes())
+					_, _ = r.w.Write(bytes.Repeat([]byte{' '}, 1+whitespaceWidth))
+				case extAST.AlignCenter:
+					first := whitespaceWidth / 2
+					_, _ = r.w.Write(bytes.Repeat([]byte{' '}, first))
+					_, _ = r.w.Write(cellBuf.Bytes())
+					_, _ = r.w.Write(bytes.Repeat([]byte{' '}, whitespaceWidth-first))
+					_, _ = r.w.Write([]byte{' '})
+				case extAST.AlignRight:
+					_, _ = r.w.Write(bytes.Repeat([]byte{' '}, whitespaceWidth))
+					_, _ = r.w.Write(cellBuf.Bytes())
+					_, _ = r.w.Write([]byte{' '})
+				}
+				colIndex++
+				return ast.WalkSkipChildren, nil
 			default:
 				return ast.WalkStop, errors.Errorf("detected unexpected tree type %s", tnode.Kind().String())
 			}
