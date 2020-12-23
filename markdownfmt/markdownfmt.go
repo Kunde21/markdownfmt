@@ -2,9 +2,7 @@ package markdownfmt
 
 import (
 	"bytes"
-	"io"
 	"io/ioutil"
-	"os"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/yuin/goldmark"
@@ -21,8 +19,7 @@ func NewGoldmark(opts ...renderer.Option) goldmark.Markdown {
 	mr := markdown.NewRenderer()
 
 	extensions := []goldmark.Extender{
-		extension.Table,         // We need this to enable | tables | .
-		extension.Strikethrough, // We need this to enable ~~strike~~ .
+		extension.GFM, // We need this to enable | tables |, ~~strike~~  and autolinks.
 	}
 	parserOptions := []parser.Option{
 		parser.WithAttribute(), // We need this to enable # headers {#custom-ids}.
@@ -44,8 +41,7 @@ func Process(filename string, src []byte, opts ...renderer.Option) ([]byte, erro
 	}
 
 	output := bytes.NewBuffer(nil)
-	// DEBUG
-	if err := NewGoldmark(opts...).Convert(text, io.MultiWriter(output, os.Stdout)); err != nil {
+	if err := NewGoldmark(opts...).Convert(text, output); err != nil {
 		return nil, err
 	}
 	return output.Bytes(), nil
