@@ -70,6 +70,11 @@ func (mr *Renderer) Render(w io.Writer, source []byte, node ast.Node) error {
 }
 
 func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error) {
+	// Autolink should be treated as normal string.
+	if a, ok := node.(*ast.AutoLink); ok {
+		node = ast.NewString(a.Label(r.source))
+	}
+
 	if entering && node.PreviousSibling() != nil {
 		switch node.(type) {
 		// All Block types (except few) usually have 2x new lines before itself when they are non-first siblings.
@@ -124,7 +129,9 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			_, _ = r.w.Write(newLineChar)
 		}
 	case *ast.String:
-		_, _ = r.w.Write(tnode.Value)
+		if entering {
+			_, _ = r.w.Write(tnode.Value)
+		}
 	case *ast.CodeSpan:
 		if entering {
 			_, _ = r.w.Write([]byte{'`'})
