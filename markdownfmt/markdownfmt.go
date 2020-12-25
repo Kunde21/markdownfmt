@@ -19,7 +19,7 @@ func NewGoldmark(opts ...renderer.Option) goldmark.Markdown {
 	mr := markdown.NewRenderer()
 
 	extensions := []goldmark.Extender{
-		extension.GFM, // We need this to enable | tables |, ~~strike~~  and autolinks.
+		extension.GFM,
 	}
 	parserOptions := []parser.Option{
 		parser.WithAttribute(), // We need this to enable # headers {#custom-ids}.
