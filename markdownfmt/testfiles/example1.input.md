@@ -15,6 +15,25 @@ But the next one...
     - [X] baz
 - [ ] bim
 
+```go
+f, err := os.Open(something)
+    if err != nil {
+    // handle..
+}
+defer f.Close() // What if an error occurs here?
+
+// Write something to file... etc.
+```
+```go
+// Non parsable go code should be handled, but will be not go fmt-ed.
+f, err := os.Open(...)
+    if err != nil {
+    // handle..
+}
+defer f.Close() // What if an error occurs here?
+
+// Write something to file... etc.
+```
 Title
 ==
 

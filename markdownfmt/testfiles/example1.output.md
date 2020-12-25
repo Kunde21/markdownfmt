@@ -12,6 +12,27 @@ Is really new.
   - [X] baz
 - [ ] bim
 
+```go
+f, err := os.Open(something)
+if err != nil {
+	// handle..
+}
+defer f.Close() // What if an error occurs here?
+
+// Write something to file... etc.
+```
+
+```go
+// Non parsable go code should be handled, but will be not go fmt-ed.
+f, err := os.Open(...)
+    if err != nil {
+    // handle..
+}
+defer f.Close() // What if an error occurs here?
+
+// Write something to file... etc.
+```
+
 # Title
 
 Paragraphs will be also concatenated for clean view. However, it might be not easy to edit it via editors, so you can specify text line width to be ensured. It also makes sure words are together,so it will ensure wanted line length as you wish.
