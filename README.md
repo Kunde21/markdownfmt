@@ -6,6 +6,7 @@ Fork of github.com/shurcooL/markdownfmt that targets following additions:
 * [Goldmark](https://github.com/yuin/goldmark) used instead of [Blackfriday](https://github.com/russross/blackfriday) to render from parsed markdown AST.
 * Full info string support for Fenced Code Block (see [issue](https://github.com/shurcooL/markdownfmt/issues/58)).
 * Hash-based headers only.
+* Full [Github Flavored Markdown](https://github.github.com/gfm) support.
 
 [![Build Status](https://travis-ci.org/Kunde21/markdownfmt.svg?branch=master)](https://travis-ci.org/Kunde21/markdownfmt) [![GoDoc](https://godoc.org/github.com/Kunde21/markdownfmt?status.svg)](https://godoc.org/github.com/Kunde21/markdownfmt)
 

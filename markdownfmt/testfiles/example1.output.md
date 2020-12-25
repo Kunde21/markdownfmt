@@ -7,6 +7,11 @@ Is really new.
 1. Item one.
 2. Item TWO.
 
+- [X] foo
+  - [ ] bar
+  - [X] baz
+- [ ] bim
+
 # Title
 
 Paragraphs will be also concatenated for clean view. However, it might be not easy to edit it via editors, so you can specify text line width to be ensured. It also makes sure words are together,so it will ensure wanted line length as you wish.

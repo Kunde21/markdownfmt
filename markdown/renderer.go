@@ -132,6 +132,15 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 		if entering {
 			_, _ = r.w.Write(tnode.Value)
 		}
+	case *extAST.TaskCheckBox:
+		if !entering {
+			break
+		}
+		if tnode.IsChecked {
+			_, _ = r.w.Write([]byte("[X] "))
+			break
+		}
+		_, _ = r.w.Write([]byte("[ ] "))
 	case *ast.CodeSpan:
 		if entering {
 			_, _ = r.w.Write([]byte{'`'})
