@@ -70,11 +70,6 @@ func (mr *Renderer) Render(w io.Writer, source []byte, node ast.Node) error {
 }
 
 func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error) {
-	// Autolink should be treated as normal string.
-	if a, ok := node.(*ast.AutoLink); ok {
-		node = ast.NewString(a.Label(r.source))
-	}
-
 	if entering && node.PreviousSibling() != nil {
 		switch node.(type) {
 		// All Block types (except few) usually have 2x new lines before itself when they are non-first siblings.
@@ -131,6 +126,11 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *ast.String:
 		if entering {
 			_, _ = r.w.Write(tnode.Value)
+		}
+	case *ast.AutoLink:
+		// We treat autolink as normal string.
+		if entering {
+			_, _ = r.w.Write(tnode.Label(r.source))
 		}
 	case *extAST.TaskCheckBox:
 		if !entering {
@@ -239,10 +239,11 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 		case "Go", "go":
 			gofmt, err := format.Source(codeBuf.Bytes())
 			if err != nil {
-				return ast.WalkStop, err
+				// We don't handle gofmt errors. If code is not compilable we just don't format it without any warning.
+				_, _ = r.w.Write(codeBuf.Bytes())
+				break
 			}
 			_, _ = r.w.Write(gofmt)
-
 		default:
 			_, _ = r.w.Write(codeBuf.Bytes())
 		}
