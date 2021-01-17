@@ -23,6 +23,8 @@ var (
 	codeBlockChars          = []byte("```")
 	tableHeaderColChar      = []byte{'-'}
 	tableHeaderAlignColChar = []byte{':'}
+	heading1UnderlineChar   = []byte{'='}
+	heading2UnderlineChar   = []byte{'-'}
 )
 
 // Ensure compatibility with Goldmark parser.
@@ -30,15 +32,26 @@ var _ renderer.Renderer = &Renderer{}
 
 // Renderer allows to render markdown AST into markdown bytes in consistent format.
 // Render is reusable across Renders, it holds configuration only.
-type Renderer struct{}
+type Renderer struct {
+	underlineHeadings bool
+}
 
-func (mr *Renderer) AddOptions(opts ...renderer.Option) {
-	c := renderer.Config{}
+func (mr *Renderer) AddOptions(...renderer.Option) {
+	// goldmark weirdness, just ignore (called with just HTML options...)
+}
+
+func (mr *Renderer) AddMarkdownOptions(opts ...Option) {
 	for _, o := range opts {
-		o.SetConfig(&c)
+		o(mr)
 	}
+}
 
-	// TODO(bwplotka): Add headers optionality (https://github.com/Kunde21/markdownfmt/issues/14).
+type Option func(r *Renderer)
+
+func WithUnderlineHeadings() Option {
+	return func(r *Renderer) {
+		r.underlineHeadings = true
+	}
 }
 
 func NewRenderer() *Renderer {
@@ -191,16 +204,16 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *ast.TextBlock:
 		break
 	case *ast.Heading:
-		if entering {
-			_, _ = r.w.Write(bytes.Repeat([]byte{'#'}, tnode.Level))
-			_, _ = r.w.Write(spaceChar)
+		if !entering {
 			break
 		}
 
-		id, hasId := node.AttributeString("id")
-		if hasId {
-			_, _ = fmt.Fprintf(r.w, " {#%s}", id)
+		// Render it straight away. No nested headings are supported and we expect
+		// headings to have limited content, so limit WALK.
+		if err := r.renderHeading(tnode); err != nil {
+			return ast.WalkStop, errors.Wrap(err, "rendering heading")
 		}
+		return ast.WalkSkipChildren, nil
 	case *ast.HTMLBlock:
 		if !entering {
 			break
