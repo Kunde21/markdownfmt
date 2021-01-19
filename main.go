@@ -13,14 +13,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/Kunde21/markdownfmt/v2/markdownfmt"
 )
 
 var (
 	// Main operation modes.
-	list   = flag.Bool("l", false, "list files whose formatting differs from markdownfmt's")
-	write  = flag.Bool("w", false, "write result to (source) file instead of stdout")
-	doDiff = flag.Bool("d", false, "display diffs instead of rewriting files")
+	list              = flag.Bool("l", false, "list files whose formatting differs from markdownfmt's")
+	write             = flag.Bool("w", false, "write result to (source) file instead of stdout")
+	doDiff            = flag.Bool("d", false, "display diffs instead of rewriting files")
+	underlineHeadings = flag.Bool("u", false, "write underline headings instead of hashes for levels 1 and 2")
 
 	exitCode = 0
 )
@@ -56,7 +58,11 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 		return err
 	}
 
-	res, err := markdownfmt.Process(filename, src)
+	var opts []markdown.Option
+	if *underlineHeadings {
+		opts = append(opts, markdown.WithUnderlineHeadings())
+	}
+	res, err := markdownfmt.Process(filename, src, opts...)
 	if err != nil {
 		return err
 	}
