@@ -8,16 +8,11 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 )
 
-// TODO(karel): unused, can we delete?
-func NewParser() parser.Parser {
-	return NewGoldmark().Parser()
-}
-
-func NewGoldmark(opts ...markdown.Option) goldmark.Markdown {
+func NewGoldmark(opts ...renderer.Option) goldmark.Markdown {
 	mr := markdown.NewRenderer()
-	mr.AddMarkdownOptions(opts...)
 	extensions := []goldmark.Extender{
 		extension.GFM,
 	}
@@ -28,14 +23,17 @@ func NewGoldmark(opts ...markdown.Option) goldmark.Markdown {
 	gm := goldmark.New(
 		goldmark.WithExtensions(extensions...),
 		goldmark.WithParserOptions(parserOptions...),
-		goldmark.WithRenderer(mr),
 	)
+	// Set renderer outside constructor to reset the
+	// html render functions registered by GFM.
+	gm.SetRenderer(mr)
+	gm.Renderer().AddOptions(opts...)
 
 	return gm
 }
 
 // Process formats given Markdown.
-func Process(filename string, src []byte, opts ...markdown.Option) ([]byte, error) {
+func Process(filename string, src []byte, opts ...renderer.Option) ([]byte, error) {
 	text, err := readSource(filename, src)
 	if err != nil {
 		return nil, err

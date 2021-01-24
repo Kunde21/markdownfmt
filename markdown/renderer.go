@@ -33,56 +33,85 @@ var _ renderer.Renderer = &Renderer{}
 // Renderer allows to render markdown AST into markdown bytes in consistent format.
 // Render is reusable across Renders, it holds configuration only.
 type Renderer struct {
+	conf              *renderer.Config
 	underlineHeadings bool
 }
 
-func (mr *Renderer) AddOptions(...renderer.Option) {
-	// goldmark weirdness, just ignore (called with just HTML options...)
-}
-
-func (mr *Renderer) AddMarkdownOptions(opts ...Option) {
+func (mr *Renderer) AddOptions(opts ...renderer.Option) {
 	for _, o := range opts {
-		o(mr)
+		o.SetConfig(mr.conf)
 	}
 }
 
-type Option func(r *Renderer)
+type Option func(r *renderer.Config)
 
-func WithUnderlineHeadings() Option {
-	return func(r *Renderer) {
-		r.underlineHeadings = true
-	}
+func (o Option) SetConfig(r *renderer.Config) { o(r) }
+
+func WithUnderlineHeadings() renderer.Option {
+	return Option(func(r *renderer.Config) {
+		if r.Options == nil {
+			r.Options = map[renderer.OptionName]interface{}{}
+		}
+		r.Options["markdownfmt.underlineHeadings"] = true
+	})
 }
 
 func NewRenderer() *Renderer {
-	return &Renderer{}
+	return &Renderer{conf: &renderer.Config{}}
 }
 
 // render represents a single markdown rendering operation.
 type render struct {
-	mr *Renderer
+	mr        *Renderer
+	overrides map[ast.NodeKind]renderer.NodeRendererFunc
 
 	// TODO(bwplotka): Wrap it with something that catch errors.
 	w      *lineIndentWriter
 	source []byte
 }
 
+// Register override method
+func (r *render) Register(k ast.NodeKind, f renderer.NodeRendererFunc) {
+	if r.overrides == nil {
+		r.overrides = map[ast.NodeKind]renderer.NodeRendererFunc{}
+	}
+	r.overrides[k] = f
+}
+
 func (mr *Renderer) newRender(w io.Writer, source []byte) *render {
-	return &render{
+	if op, ok := mr.conf.Options["markdownfmt.underlineHeadings"]; ok {
+		mr.underlineHeadings = op.(bool)
+	}
+	mr.conf.NodeRenderers.Sort()
+	rdr := &render{
 		mr:     mr,
 		w:      wrapWithLineIndentWriter(w),
 		source: source,
 	}
+
+	for _, nr := range mr.conf.NodeRenderers {
+		if nr.Value == nil {
+			continue
+		}
+		if r, ok := nr.Value.(renderer.NodeRenderer); ok {
+			r.RegisterFuncs(rdr)
+		}
+	}
+
+	return rdr
 }
 
 // Render renders the given AST node to the given buffer with the given Renderer.
 // NOTE: This is the entry point used by Goldmark.
 func (mr *Renderer) Render(w io.Writer, source []byte, node ast.Node) error {
 	// Perform DFS.
-	return ast.Walk(node, mr.newRender(w, source).renderNode)
+	rdr := mr.newRender(w, source)
+	defer rdr.w.Flush()
+	return ast.Walk(node, rdr.renderNode)
 }
 
 func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error) {
+	defer r.w.Flush()
 	if entering && node.PreviousSibling() != nil {
 		switch node.(type) {
 		// All Block types (except few) usually have 2x new lines before itself when they are non-first siblings.
@@ -104,6 +133,12 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			}
 		}
 	}
+
+	// NOTE: checking override here risks picking up render options from extensions
+	// like GFM, which registers all of its HTML render functions.
+	// if ovr, ok := r.overrides[node.Kind()]; ok {
+	// 	return ovr(r.w, r.source, node, entering)
+	// }
 
 	switch tnode := node.(type) {
 	case *ast.Document:
@@ -303,7 +338,11 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *extAST.TableRow, *extAST.TableHeader:
 		return ast.WalkStop, errors.Errorf("%v element detected, but table should be rendered in renderTable instead", tnode.Kind().String())
 	default:
-		return ast.WalkStop, errors.Errorf("detected unexpected tree type %s", tnode.Kind().String())
+		if ovr, ok := r.overrides[node.Kind()]; ok {
+			fmt.Println("extended kind:", node.Kind())
+			return ovr(r.w, r.source, node, entering)
+		}
+		return ast.WalkStop, errors.Errorf("detected unexpected node %s", tnode.Kind().String())
 	}
 	return ast.WalkContinue, nil
 }

@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 
@@ -9,7 +10,7 @@ import (
 
 // lineIndentWriter wraps io.Writer and adds given indent everytime new line is created .
 type lineIndentWriter struct {
-	io.Writer
+	*bufio.Writer
 
 	indent                []byte
 	whitespace            []byte
@@ -19,7 +20,7 @@ type lineIndentWriter struct {
 }
 
 func wrapWithLineIndentWriter(w io.Writer) *lineIndentWriter {
-	return &lineIndentWriter{Writer: w, previousCharWasNewLine: true}
+	return &lineIndentWriter{Writer: bufio.NewWriter(w), previousCharWasNewLine: true}
 }
 
 func (l *lineIndentWriter) UpdateIndent(node ast.Node, entering bool) {
