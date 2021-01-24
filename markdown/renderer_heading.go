@@ -3,6 +3,8 @@ package markdown
 import (
 	"bytes"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/yuin/goldmark/ast"
@@ -34,10 +36,38 @@ func (r *render) renderHeading(node *ast.Heading) error {
 			return err
 		}
 	}
+	a := node.Attributes()
+	sort.SliceStable(a, func(i, j int) bool {
+		switch {
+		case bytes.Equal(a[i].Name, []byte("id")):
+			return true
+		case bytes.Equal(a[j].Name, []byte("id")):
+			return false
+		case bytes.Equal(a[i].Name, []byte("class")):
+			return true
+		case bytes.Equal(a[j].Name, []byte("class")):
+			return false
+		}
+		return bytes.Compare(a[i].Name, a[j].Name) == -1
+	})
 
-	id, hasId := node.AttributeString("id")
-	if hasId {
-		_, _ = fmt.Fprintf(&headBuf, " {#%s}", id)
+	hAttr := []string{}
+	for _, attr := range node.Attributes() {
+		switch string(attr.Name) {
+		case "id":
+			hAttr = append(hAttr, fmt.Sprintf("#%s", attr.Value))
+		case "class":
+			hAttr = append(hAttr, strings.ReplaceAll(fmt.Sprintf(".%s", attr.Value), " ", " ."))
+		default:
+			if attr.Value == nil {
+				hAttr = append(hAttr, string(attr.Name))
+				continue
+			}
+			hAttr = append(hAttr, fmt.Sprintf("%s=%s", string(attr.Name), attr.Value))
+		}
+	}
+	if len(hAttr) != 0 {
+		_, _ = fmt.Fprintf(&headBuf, " {%s}", strings.Join(hAttr, " "))
 	}
 
 	_, _ = r.w.Write(headBuf.Bytes())

@@ -37,3 +37,9 @@ Paragraph
 > ## Header {#custom}
 >
 > ### Header {#custom}
+
+# Header {#custom .withClass}
+
+## Header {#custom .withClass singleTag}
+
+### Header {#custom .withClass singleTag other=opt}
