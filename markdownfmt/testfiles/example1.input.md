@@ -34,13 +34,13 @@ defer f.Close() // What if an error occurs here?
 
 // Write something to file... etc.
 ```
-Title
+Title {#title}
 ==
 
 Paragraphs will be also concatenated for clean view.
 However, it might be not easy to edit it via editors, so you can specify text line width to be ensured. It also makes sure words are together,so it will ensure wanted line length as you wish.
 
-Subtitle
+Subtitle {other=attribute class="subhead bold" id=sub}
 ---
 
 How about `this` and other stuff 
