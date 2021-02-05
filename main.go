@@ -15,6 +15,7 @@ import (
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/Kunde21/markdownfmt/v2/markdownfmt"
+	"github.com/yuin/goldmark/renderer"
 )
 
 var (
@@ -58,7 +59,7 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 		return err
 	}
 
-	var opts []markdown.Option
+	var opts []renderer.Option
 	if *underlineHeadings {
 		opts = append(opts, markdown.WithUnderlineHeadings())
 	}
