@@ -326,6 +326,9 @@ func listItemMarkerChars(tnode *ast.ListItem) []byte {
 	parList := tnode.Parent().(*ast.List)
 	if parList.IsOrdered() {
 		cnt := 1
+		if parList.Start != 0 {
+			cnt = parList.Start
+		}
 		s := tnode.PreviousSibling()
 		for s != nil {
 			cnt++
