@@ -12,6 +12,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 	extAST "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/renderer"
+	"github.com/yuin/goldmark/text"
 )
 
 var (
@@ -88,10 +89,10 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 		// All Block types (except few) usually have 2x new lines before itself when they are non-first siblings.
 		case *ast.Paragraph, *ast.Heading, *ast.FencedCodeBlock,
 			*ast.CodeBlock, *ast.ThematicBreak, *extAST.Table,
-			*ast.Blockquote, *ast.HTMLBlock:
+			*ast.Blockquote:
 			_, _ = r.w.Write(newLineChar)
 			_, _ = r.w.Write(newLineChar)
-		case *ast.List:
+		case *ast.List, *ast.HTMLBlock:
 			_, _ = r.w.Write(newLineChar)
 			if node.HasBlankPreviousLines() {
 				_, _ = r.w.Write(newLineChar)
@@ -192,16 +193,15 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			break
 		}
 
-		l := tnode.Segments.Len()
-		for i := 0; i < l; i++ {
+		for i := 0; i < tnode.Segments.Len(); i++ {
 			segment := tnode.Segments.At(i)
 			_, _ = r.w.Write(segment.Value(r.source))
 		}
+		return ast.WalkSkipChildren, nil
 
 	// Blocks.
-	case *ast.Paragraph:
-		break
-	case *ast.TextBlock:
+	case *ast.Paragraph, *ast.TextBlock, *ast.List, *extAST.TableCell:
+		// Things that has no content, just children elements, go there.
 		break
 	case *ast.Heading:
 		if !entering {
@@ -219,7 +219,22 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			break
 		}
 
-		_, _ = r.w.Write(newLineChar)
+		var segments []text.Segment
+		for i := 0; i < node.Lines().Len(); i++ {
+			segments = append(segments, node.Lines().At(i))
+		}
+
+		if tnode.ClosureLine.Len() != 0 {
+			segments = append(segments, tnode.ClosureLine)
+		}
+		for i, s := range segments {
+			o := s.Value(r.source)
+			if i == len(segments)-1 {
+				o = bytes.TrimSuffix(o, []byte("\n"))
+			}
+			_, _ = r.w.Write(o)
+		}
+		return ast.WalkSkipChildren, nil
 	case *ast.CodeBlock, *ast.FencedCodeBlock:
 		if !entering {
 			break
@@ -276,8 +291,7 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			node.PreviousSibling() == nil {
 			_, _ = r.w.Write(blockquoteChars)
 		}
-	case *ast.List:
-		break
+
 	case *ast.ListItem:
 		if entering {
 			_, _ = r.w.Write(listItemMarkerChars(tnode))
@@ -298,8 +312,6 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			return ast.WalkStop, errors.Wrap(err, "rendering table")
 		}
 		return ast.WalkSkipChildren, nil
-	case *extAST.TableCell:
-		break
 	case *extAST.TableRow, *extAST.TableHeader:
 		return ast.WalkStop, errors.Errorf("%v element detected, but table should be rendered in renderTable instead", tnode.Kind().String())
 	default:
