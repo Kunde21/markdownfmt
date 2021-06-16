@@ -2,6 +2,7 @@ package markdownfmt_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -99,6 +100,8 @@ func TestDifferent(t *testing.T) {
 			}
 
 			if len(diff) != 0 {
+				fmt.Println("----\n", string(output), "\n---")
+
 				t.Errorf("Difference in %s of %d lines:\n%s", f, bytes.Count(diff, []byte("\n")), string(diff))
 			}
 		})
