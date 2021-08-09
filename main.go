@@ -23,7 +23,7 @@ var (
 	write             = flag.Bool("w", false, "write result to (source) file instead of stdout")
 	doDiff            = flag.Bool("d", false, "display diffs instead of rewriting files")
 	underlineHeadings = flag.Bool("u", false, "write underline headings instead of hashes for levels 1 and 2")
-	hardWraps         = flag.Bool("h", false, "hard wrap lines even on soft line breaks")
+	softWraps         = flag.Bool("soft-wraps", false, "wrap lines even on soft line breaks")
 
 	exitCode = 0
 )
@@ -63,8 +63,8 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 	if *underlineHeadings {
 		opts = append(opts, markdown.WithUnderlineHeadings())
 	}
-	if *hardWraps {
-		opts = append(opts, markdown.WithHardWraps())
+	if *softWraps {
+		opts = append(opts, markdown.WithSoftWraps())
 	}
 	res, err := markdownfmt.Process(filename, src, opts...)
 	if err != nil {

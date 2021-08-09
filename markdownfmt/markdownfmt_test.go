@@ -44,7 +44,7 @@ func TestSame(t *testing.T) {
 }
 
 func TestWithHardWraps(t *testing.T) {
-	matches, err := filepath.Glob("testfiles/*.same-hardwrap.md")
+	matches, err := filepath.Glob("testfiles/*same-softwrap.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestWithHardWraps(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			output, err := markdownfmt.Process("", reference, markdown.WithHardWraps())
+			output, err := markdownfmt.Process("", reference, markdown.WithSoftWraps())
 			if err != nil {
 				t.Fatal(err)
 			}

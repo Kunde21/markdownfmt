@@ -35,7 +35,7 @@ var _ renderer.Renderer = &Renderer{}
 // Render is reusable across Renders, it holds configuration only.
 type Renderer struct {
 	underlineHeadings bool
-	hardWraps         bool
+	softWraps         bool
 }
 
 func (mr *Renderer) AddOptions(...renderer.Option) {
@@ -56,9 +56,10 @@ func WithUnderlineHeadings() Option {
 	}
 }
 
-func WithHardWraps() Option {
+// WithSoftWraps allows you to wrap lines even on soft line breaks.
+func WithSoftWraps() Option {
 	return func(r *Renderer) {
-		r.hardWraps = true
+		r.softWraps = true
 	}
 }
 
@@ -136,7 +137,7 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 
 		if tnode.SoftLineBreak() {
 			char := spaceChar
-			if r.mr.hardWraps {
+			if r.mr.softWraps {
 				char = newLineChar
 			}
 			_, _ = r.w.Write(char)
