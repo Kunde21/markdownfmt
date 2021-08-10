@@ -43,6 +43,35 @@ func TestSame(t *testing.T) {
 	}
 }
 
+func TestWithHardWraps(t *testing.T) {
+	matches, err := filepath.Glob("testfiles/*same-softwrap.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range matches {
+		t.Run(f, func(t *testing.T) {
+			reference, err := ioutil.ReadFile(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			output, err := markdownfmt.Process("", reference, markdown.WithSoftWraps())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			diff, err := diff(reference, output)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(diff) != 0 {
+				t.Errorf("Difference in %s of %d lines:\n%s", f, bytes.Count(diff, []byte("\n")), string(diff))
+			}
+		})
+	}
+}
+
 func TestSameUnderline(t *testing.T) {
 	matches, err := filepath.Glob("testfiles/*.same-underline.md")
 	if err != nil {
