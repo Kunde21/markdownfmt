@@ -8,7 +8,8 @@ Fork of github.com/shurcooL/markdownfmt that targets following additions:
 * Hash-based headers only.
 * Full [Github Flavored Markdown](https://github.github.com/gfm) support.
 
-[![Build Status](https://travis-ci.org/Kunde21/markdownfmt.svg?branch=master)](https://travis-ci.org/Kunde21/markdownfmt) [![GoDoc](https://godoc.org/github.com/Kunde21/markdownfmt?status.svg)](https://godoc.org/github.com/Kunde21/markdownfmt)
+[![Build Status](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml/badge.svg?query=branch%3Amaster)](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml?query=branch%3Amaster)
+[![GoDoc](https://godoc.org/github.com/Kunde21/markdownfmt?status.svg)](https://godoc.org/github.com/Kunde21/markdownfmt)
 
 Like `gofmt`, but for Markdown.
 
