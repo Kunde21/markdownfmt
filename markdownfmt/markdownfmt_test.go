@@ -3,7 +3,6 @@ package markdownfmt_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +20,7 @@ func TestSame(t *testing.T) {
 	}
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
-			reference, err := ioutil.ReadFile(f)
+			reference, err := os.ReadFile(f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -50,7 +49,7 @@ func TestWithHardWraps(t *testing.T) {
 	}
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
-			reference, err := ioutil.ReadFile(f)
+			reference, err := os.ReadFile(f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -79,7 +78,7 @@ func TestSameUnderline(t *testing.T) {
 	}
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
-			reference, err := ioutil.ReadFile(f)
+			reference, err := os.ReadFile(f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -108,12 +107,12 @@ func TestDifferent(t *testing.T) {
 	}
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
-			input, err := ioutil.ReadFile(f)
+			input, err := os.ReadFile(f)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			expOutput, err := ioutil.ReadFile(strings.ReplaceAll(f, ".input.md", ".output.md"))
+			expOutput, err := os.ReadFile(strings.ReplaceAll(f, ".input.md", ".output.md"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -138,7 +137,7 @@ func TestDifferent(t *testing.T) {
 }
 
 func TestCustomCodeFormatter(t *testing.T) {
-	reference, err := ioutil.ReadFile("testfiles/nested-code.same.md")
+	reference, err := os.ReadFile("testfiles/nested-code.same.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,14 +160,14 @@ func TestCustomCodeFormatter(t *testing.T) {
 
 // TODO: Factor out.
 func diff(b1, b2 []byte) (data []byte, err error) {
-	f1, err := ioutil.TempFile("", "markdownfmt")
+	f1, err := os.CreateTemp("", "markdownfmt")
 	if err != nil {
 		return
 	}
 	defer os.Remove(f1.Name())
 	defer f1.Close()
 
-	f2, err := ioutil.TempFile("", "markdownfmt")
+	f2, err := os.CreateTemp("", "markdownfmt")
 	if err != nil {
 		return
 	}

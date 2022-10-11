@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"go/scanner"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +53,7 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 		in = f
 	}
 
-	src, err := ioutil.ReadAll(in)
+	src, err := io.ReadAll(in)
 	if err != nil {
 		return err
 	}
@@ -77,7 +76,7 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 			fmt.Fprintln(out, filename)
 		}
 		if *write {
-			err = ioutil.WriteFile(filename, res, 0)
+			err = os.WriteFile(filename, res, 0)
 			if err != nil {
 				return err
 			}
@@ -153,14 +152,14 @@ func markdownfmtMain() {
 }
 
 func diff(b1, b2 []byte) (data []byte, err error) {
-	f1, err := ioutil.TempFile("", "markdownfmt")
+	f1, err := os.CreateTemp("", "markdownfmt")
 	if err != nil {
 		return
 	}
 	defer os.Remove(f1.Name())
 	defer f1.Close()
 
-	f2, err := ioutil.TempFile("", "markdownfmt")
+	f2, err := os.CreateTemp("", "markdownfmt")
 	if err != nil {
 		return
 	}
