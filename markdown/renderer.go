@@ -36,6 +36,9 @@ var _ renderer.Renderer = &Renderer{}
 type Renderer struct {
 	underlineHeadings bool
 	softWraps         bool
+
+	// language name => format function
+	formatters map[string]func([]byte) []byte
 }
 
 func (mr *Renderer) AddOptions(...renderer.Option) {
@@ -63,8 +66,76 @@ func WithSoftWraps() Option {
 	}
 }
 
+// CodeFormatter reformats code samples found in the document,
+// matching them by name.
+type CodeFormatter struct {
+	// Name of the language.
+	Name string
+
+	// Aliases for the language, if any.
+	Aliases []string
+
+	// Function to format the code snippet.
+	// In case of errors, format functions should typically return
+	// the original string unchanged.
+	Format func([]byte) []byte
+}
+
+// WithCodeFormatters changes the functions used to reformat code blocks found
+// in the original file.
+//
+//	formatters := DefaultCodeFormatters()
+//	formatters = append(formatters, ...)
+//
+//	r := NewRenderer()
+//	r.AddMarkdownOptions(WithCodeFormatters(formatters))
+//
+// Pass an empty list to disable code formatting.
+//
+//	r := NewRenderer()
+//	r.AddMarkdownOptions(WithCodeFormatters())
+//
+// Defaults to DefaultCodeFormatters.
+func WithCodeFormatters(fs ...CodeFormatter) Option {
+	return func(r *Renderer) {
+		formatters := make(map[string]func([]byte) []byte, len(fs))
+		for _, f := range fs {
+			formatters[f.Name] = f.Format
+			for _, alias := range f.Aliases {
+				formatters[alias] = f.Format
+			}
+		}
+		r.formatters = formatters
+	}
+}
+
+// DefaultCodeFormatters reports the list of default code formatters
+// used by the system.
+//
+// Replace this with WithCodeFormatters.
+func DefaultCodeFormatters() []CodeFormatter {
+	return []CodeFormatter{
+		{
+			Name:    "go",
+			Aliases: []string{"Go"},
+			Format: func(src []byte) []byte {
+				gofmt, err := format.Source(src)
+				if err != nil {
+					// We don't handle gofmt errors.
+					// If code is not compilable we just
+					// don't format it without any warning.
+					return src
+				}
+				return gofmt
+			},
+		},
+	}
+}
+
 func NewRenderer() *Renderer {
-	return &Renderer{}
+	r := &Renderer{}
+	r.AddMarkdownOptions(WithCodeFormatters(DefaultCodeFormatters()...))
+	return r
 }
 
 // render represents a single markdown rendering operation.
@@ -275,16 +346,14 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 			_, _ = codeBuf.Write(line.Value(r.source))
 		}
 
-		switch noAllocString(lang) {
-		case "Go", "go":
-			gofmt, err := format.Source(codeBuf.Bytes())
-			if err != nil {
-				// We don't handle gofmt errors. If code is not compilable we just don't format it without any warning.
-				_, _ = r.w.Write(codeBuf.Bytes())
-				break
+		if formatCode, ok := r.mr.formatters[noAllocString(lang)]; ok {
+			code := formatCode(codeBuf.Bytes())
+			if !bytes.HasSuffix(code, newLineChar) {
+				// Ensure code sample ends with a newline.
+				code = append(code, newLineChar...)
 			}
-			_, _ = r.w.Write(gofmt)
-		default:
+			_, _ = r.w.Write(code)
+		} else {
 			_, _ = r.w.Write(codeBuf.Bytes())
 		}
 

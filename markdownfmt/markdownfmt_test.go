@@ -137,6 +137,28 @@ func TestDifferent(t *testing.T) {
 	}
 }
 
+func TestCustomCodeFormatter(t *testing.T) {
+	reference, err := ioutil.ReadFile("testfiles/nested-code.same.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := markdownfmt.Process(
+		"", reference, markdown.WithCodeFormatters(markdown.CodeFormatter{
+			Name: "Makefile",
+			Format: func(b []byte) []byte {
+				return []byte("replaced contents")
+			},
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := " replaced contents\n"; !bytes.Contains(output, []byte(want)) {
+		t.Errorf("output does not contain %q:\n%s", want, output)
+	}
+}
+
 // TODO: Factor out.
 func diff(b1, b2 []byte) (data []byte, err error) {
 	f1, err := ioutil.TempFile("", "markdownfmt")
