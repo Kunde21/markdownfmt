@@ -2,7 +2,7 @@ package markdownfmt
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/yuin/goldmark"
@@ -54,5 +54,5 @@ func readSource(filename string, src []byte) ([]byte, error) {
 	if src != nil {
 		return src, nil
 	}
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
