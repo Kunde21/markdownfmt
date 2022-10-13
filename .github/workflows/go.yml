@@ -10,13 +10,17 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.18.x", "1.19.x"]
+
     steps:
     - uses: actions/checkout@v2
 
-    - name: Set up Go
+    - name: Set up Go ${{ matrix.go }}
       uses: actions/setup-go@v2
       with:
-        go-version: 1.15
+        go-version: ${{ matrix.go }}
 
     - name: Build
       run: go build -v ./...

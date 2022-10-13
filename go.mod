@@ -6,4 +6,4 @@ require (
 	github.com/yuin/goldmark v1.3.5
 )
 
-go 1.13
+go 1.18
