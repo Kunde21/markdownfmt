@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/Kunde21/markdownfmt/v2/markdownfmt"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestSame(t *testing.T) {
@@ -30,13 +30,9 @@ func TestSame(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			diff, err := diff(reference, output)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if len(diff) != 0 {
-				t.Errorf("Difference in %s of %d lines:\n%s", f, bytes.Count(diff, []byte("\n")), string(diff))
+			diff := diff(reference, output)
+			if diff != "" {
+				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
 			}
 		})
 	}
@@ -59,13 +55,9 @@ func TestWithHardWraps(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			diff, err := diff(reference, output)
-			if err != nil {
-				t.Fatal(err)
-			}
-
+			diff := diff(reference, output)
 			if len(diff) != 0 {
-				t.Errorf("Difference in %s of %d lines:\n%s", f, bytes.Count(diff, []byte("\n")), string(diff))
+				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
 			}
 		})
 	}
@@ -88,13 +80,9 @@ func TestSameUnderline(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			diff, err := diff(reference, output)
-			if err != nil {
-				t.Fatal(err)
-			}
-
+			diff := diff(reference, output)
 			if len(diff) != 0 {
-				t.Errorf("Difference in %s of %d lines:\n%s", f, bytes.Count(diff, []byte("\n")), string(diff))
+				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
 			}
 		})
 	}
@@ -122,15 +110,11 @@ func TestDifferent(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			diff, err := diff(expOutput, output)
-			if err != nil {
-				t.Fatal(err)
-			}
-
+			diff := diff(expOutput, output)
 			if len(diff) != 0 {
 				fmt.Println("----\n", string(output), "\n---")
 
-				t.Errorf("Difference in %s of %d lines:\n%s", f, bytes.Count(diff, []byte("\n")), string(diff))
+				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
 			}
 		})
 	}
@@ -158,36 +142,6 @@ func TestCustomCodeFormatter(t *testing.T) {
 	}
 }
 
-// TODO: Factor out.
-func diff(b1, b2 []byte) (data []byte, err error) {
-	f1, err := os.CreateTemp("", "markdownfmt")
-	if err != nil {
-		return
-	}
-	defer os.Remove(f1.Name())
-	defer f1.Close()
-
-	f2, err := os.CreateTemp("", "markdownfmt")
-	if err != nil {
-		return
-	}
-	defer os.Remove(f2.Name())
-	defer f2.Close()
-
-	_, err = f1.Write(b1)
-	if err != nil {
-		return
-	}
-	_, err = f2.Write(b2)
-	if err != nil {
-		return
-	}
-
-	data, err = exec.Command("diff", "-u", f1.Name(), f2.Name()).CombinedOutput()
-	if len(data) > 0 {
-		// diff exits with a non-zero status when the files don't match.
-		// Ignore that failure as long as we get output.
-		err = nil
-	}
-	return
+func diff(want, got []byte) string {
+	return cmp.Diff(string(want), string(got))
 }
