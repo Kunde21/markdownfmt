@@ -13,7 +13,10 @@ jobs:
     strategy:
       matrix:
         go: ["1.18.x", "1.19.x"]
-
+        include:
+        - go: 1.19.x
+          os: "ubuntu-latest"
+          latest: true
     steps:
     - uses: actions/checkout@v2
 
@@ -24,6 +27,13 @@ jobs:
 
     - name: Build
       run: make build
+
+    - name: Lint
+      run: make lint
+      # Lint rules change between versions of Go,
+      # and it's sometimes not possible to comply with both.
+      # Therefore, lint only with the latest Go version.
+      if: matrix.latest
 
     - name: Test
       run: make test
