@@ -10,6 +10,11 @@ MDFMT_FILES = README.md
 
 MARKDOWNFMT = bin/markdownfmt
 
+.PHONY: help
+help: ## Prints list of targets and help for them.
+	@grep -F '##' $(MAKEFILE_LIST) | grep -v grep | sed -e 's/##/\t/' | \
+		column -t -s $$'\t'
+
 .PHONY: build
 build: ## Builds all packages.
 	go build -v ./...
