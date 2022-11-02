@@ -5,6 +5,9 @@ GOFMT_FILES = $(shell git ls-files '*.go')
 # Non-test source files.
 SRC_FILES = $(shell git ls-files '*.go' | grep -v '_test.go$$')
 
+# List of Markdown files that are required to be markdownfmt-compliant.
+MDFMT_FILES = README.md
+
 MARKDOWNFMT = bin/markdownfmt
 
 .PHONY: build
@@ -16,8 +19,8 @@ test: ## Tests all packages.
 	go test -v ./...
 
 .PHONY: lint
-lint: ## Runs various analyses on the code
-lint: check-gofmt check-tidy
+lint: ## Runs various analyses on the code.
+lint: check-gofmt check-tidy check-mdfmt
 
 .PHONY: gofmt
 gofmt: ## Makes all files gofmt compliant.
@@ -45,6 +48,22 @@ check-tidy: tidy
 		echo "--- go.mod/go.sum are out of date:"; \
 		echo "$$DIFF"; \
 		echo "Run 'make tidy' to fix"; \
+		exit 1; \
+	fi
+
+.PHONY: mdfmt
+mdfmt: ## Reformats Markdown files with markdownfmt.
+mdfmt: $(MARKDOWNFMT)
+	$(MARKDOWNFMT) -w $(MDFMT_FILES)
+
+.PHONY: check-mdfmt
+check-mdfmt: ## Verifies that all Markdown files are properly formatted.
+check-mdfmt: $(MARKDOWNFMT)
+	@DIFF=$$($(MARKDOWNFMT) -d $(MDFMT_FILES)); \
+	if [ -n "$$DIFF" ]; then \
+		echo "--- mdfmt would change:"; \
+		echo "$$DIFF"; \
+		echo "Run 'make mdfmt' to fix"; \
 		exit 1; \
 	fi
 
