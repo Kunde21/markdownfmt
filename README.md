@@ -9,7 +9,7 @@ Fork of github.com/shurcooL/markdownfmt that targets following additions:
 * Full [Github Flavored Markdown](https://github.github.com/gfm) support.
 
 [![Build Status](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml/badge.svg?query=branch%3Amaster)](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml?query=branch%3Amaster)
-[![GoDoc](https://godoc.org/github.com/Kunde21/markdownfmt?status.svg)](https://godoc.org/github.com/Kunde21/markdownfmt)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Kunde21/markdownfmt/v2.svg)](https://pkg.go.dev/github.com/Kunde21/markdownfmt/v2)
 
 Like `gofmt`, but for Markdown.
 
