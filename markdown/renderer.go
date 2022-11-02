@@ -1,4 +1,3 @@
-// Package renderer renders the given AST to certain formats.
 package markdown
 
 import (
