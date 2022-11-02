@@ -2,6 +2,11 @@
 # must be properly gofmt-ed.
 GOFMT_FILES = $(shell git ls-files '*.go')
 
+# Non-test source files.
+SRC_FILES = $(shell git ls-files '*.go' | grep -v '_test.go$$')
+
+MARKDOWNFMT = bin/markdownfmt
+
 .PHONY: build
 build: ## Builds all packages.
 	go build -v ./...
@@ -42,3 +47,6 @@ check-tidy: tidy
 		echo "Run 'make tidy' to fix"; \
 		exit 1; \
 	fi
+
+$(MARKDOWNFMT): $(SRC_FILES)
+	go build -o $@
