@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"io"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -35,6 +36,8 @@ var _ renderer.Renderer = &Renderer{}
 type Renderer struct {
 	underlineHeadings bool
 	softWraps         bool
+	emphToken         []byte
+	strongToken       []byte // if nil, use emphToken*2
 
 	// language name => format function
 	formatters map[string]func([]byte) []byte
@@ -62,6 +65,27 @@ func WithUnderlineHeadings() Option {
 func WithSoftWraps() Option {
 	return func(r *Renderer) {
 		r.softWraps = true
+	}
+}
+
+// WithEmphasisToken specifies the character used to wrap emphasised text.
+// Per the CommonMark spec, valid values are '*' and '_'.
+//
+// Defaults to '*'.
+func WithEmphasisToken(c rune) Option {
+	return func(r *Renderer) {
+		r.emphToken = utf8.AppendRune(nil, c)
+	}
+}
+
+// WithStrongToken specifies the string used to wrap bold text.
+// Per the CommonMark spec, valid values are '**' and '__'.
+//
+// Defaults to repeating the emphasis token twice.
+// See [WithEmphasisToken] for how to change that.
+func WithStrongToken(s string) Option {
+	return func(r *Renderer) {
+		r.strongToken = []byte(s)
 	}
 }
 
@@ -132,7 +156,12 @@ func DefaultCodeFormatters() []CodeFormatter {
 }
 
 func NewRenderer() *Renderer {
-	r := &Renderer{}
+	r := &Renderer{
+		emphToken: []byte{'*'},
+		// Leave strongToken as nil by default.
+		// At render time, we'll use what was specified,
+		// or repeat emphToken twice to get the strong token.
+	}
 	r.AddMarkdownOptions(WithCodeFormatters(DefaultCodeFormatters()...))
 	return r
 }
@@ -141,16 +170,26 @@ func NewRenderer() *Renderer {
 type render struct {
 	mr *Renderer
 
+	emphToken   []byte
+	strongToken []byte
+
 	// TODO(bwplotka): Wrap it with something that catch errors.
 	w      *lineIndentWriter
 	source []byte
 }
 
 func (mr *Renderer) newRender(w io.Writer, source []byte) *render {
+	strongToken := mr.strongToken
+	if len(strongToken) == 0 {
+		strongToken = bytes.Repeat(mr.emphToken, 2)
+	}
+
 	return &render{
-		mr:     mr,
-		w:      wrapWithLineIndentWriter(w),
-		source: source,
+		mr:          mr,
+		w:           wrapWithLineIndentWriter(w),
+		source:      source,
+		strongToken: strongToken,
+		emphToken:   mr.emphToken,
 	}
 }
 
@@ -247,7 +286,16 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *extAST.Strikethrough:
 		return r.wrapNonEmptyContentWith(strikeThroughChars, entering), nil
 	case *ast.Emphasis:
-		return r.wrapNonEmptyContentWith(bytes.Repeat([]byte{'*'}, tnode.Level), entering), nil
+		var emWrapper []byte
+		switch tnode.Level {
+		case 1:
+			emWrapper = r.emphToken
+		case 2:
+			emWrapper = r.strongToken
+		default:
+			emWrapper = bytes.Repeat(r.emphToken, tnode.Level)
+		}
+		return r.wrapNonEmptyContentWith(emWrapper, entering), nil
 	case *ast.Link:
 		if entering {
 			r.w.AddIndentOnFirstWrite([]byte("["))
