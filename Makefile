@@ -6,7 +6,7 @@ GOFMT_FILES = $(shell git ls-files '*.go')
 SRC_FILES = $(shell git ls-files '*.go' | grep -v '_test.go$$')
 
 # List of Markdown files that are required to be markdownfmt-compliant.
-MDFMT_FILES = README.md
+MDFMT_FILES = README.md CHANGELOG.md
 
 MARKDOWNFMT = bin/markdownfmt
 
