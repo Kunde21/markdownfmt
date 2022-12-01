@@ -8,7 +8,6 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/pkg/errors"
 	"github.com/yuin/goldmark/ast"
 	extAST "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/renderer"
@@ -341,7 +340,7 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 		// Render it straight away. No nested headings are supported and we expect
 		// headings to have limited content, so limit WALK.
 		if err := r.renderHeading(tnode); err != nil {
-			return ast.WalkStop, errors.Wrap(err, "rendering heading")
+			return ast.WalkStop, fmt.Errorf("rendering heading: %w", err)
 		}
 		return ast.WalkSkipChildren, nil
 	case *ast.HTMLBlock:
@@ -437,13 +436,13 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 		// Render it straight away. No nested tables are supported and we expect
 		// tables to have limited content, so limit WALK.
 		if err := r.renderTable(tnode); err != nil {
-			return ast.WalkStop, errors.Wrap(err, "rendering table")
+			return ast.WalkStop, fmt.Errorf("rendering table: %w", err)
 		}
 		return ast.WalkSkipChildren, nil
 	case *extAST.TableRow, *extAST.TableHeader:
-		return ast.WalkStop, errors.Errorf("%v element detected, but table should be rendered in renderTable instead", tnode.Kind().String())
+		return ast.WalkStop, fmt.Errorf("%v element detected, but table should be rendered in renderTable instead", tnode.Kind())
 	default:
-		return ast.WalkStop, errors.Errorf("detected unexpected tree type %s", tnode.Kind().String())
+		return ast.WalkStop, fmt.Errorf("detected unexpected tree type %v", tnode.Kind())
 	}
 	return ast.WalkContinue, nil
 }
