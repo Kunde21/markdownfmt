@@ -42,18 +42,24 @@ type Renderer struct {
 	formatters map[string]func([]byte) []byte
 }
 
+// AddOptions does not do anything.
+// You probably want to use [Renderer.AddMarkdownOptions].
 func (mr *Renderer) AddOptions(...renderer.Option) {
 	// goldmark weirdness, just ignore (called with just HTML options...)
 }
 
+// AddMarkdownOptions modifies the Renderer with the given options.
 func (mr *Renderer) AddMarkdownOptions(opts ...Option) {
 	for _, o := range opts {
 		o(mr)
 	}
 }
 
+// Option customizes the behavior of the markdown renderer.
 type Option func(r *Renderer)
 
+// WithUnderlineHeadings configures the renderer to use
+// Setext-style headers (=== and ---).
 func WithUnderlineHeadings() Option {
 	return func(r *Renderer) {
 		r.underlineHeadings = true
@@ -154,6 +160,19 @@ func DefaultCodeFormatters() []CodeFormatter {
 	}
 }
 
+// NewRenderer builds a new Markdown renderer with default settings.
+// To use this with goldmark.Markdown, use the goldmark.WithRenderer option.
+//
+//	r := markdown.NewRenderer()
+//	md := goldmark.New(goldmark.WithRenderer(r))
+//	md.Convert(src, w)
+//
+// Alternatively, you can call [Renderer.Render] directly.
+//
+//	r := markdown.NewRenderer()
+//	r.Render(w, src, node)
+//
+// Use [Renderer.AddMarkdownOptions] to customize the output of the renderer.
 func NewRenderer() *Renderer {
 	r := &Renderer{
 		emphToken: []byte{'*'},
@@ -192,7 +211,9 @@ func (mr *Renderer) newRender(w io.Writer, source []byte) *render {
 	}
 }
 
-// Render renders the given AST node to the given buffer with the given Renderer.
+// Render renders the given AST node to the given writer,
+// given the original source from which the node was parsed.
+//
 // NOTE: This is the entry point used by Goldmark.
 func (mr *Renderer) Render(w io.Writer, source []byte, node ast.Node) error {
 	// Perform DFS.
