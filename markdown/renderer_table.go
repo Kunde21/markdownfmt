@@ -2,9 +2,9 @@ package markdown
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/mattn/go-runewidth"
-	"github.com/pkg/errors"
 	"github.com/yuin/goldmark/ast"
 	extAST "github.com/yuin/goldmark/extension/ast"
 )
@@ -45,7 +45,7 @@ func (r *render) renderTable(node *extAST.Table) error {
 					return ast.WalkSkipChildren, nil
 				}
 			default:
-				return ast.WalkStop, errors.Errorf("detected unexpected tree type %s", tnode.Kind().String())
+				return ast.WalkStop, fmt.Errorf("detected unexpected tree type %v", tnode.Kind())
 			}
 			return ast.WalkContinue, nil
 		}); err != nil {
@@ -129,7 +129,7 @@ func (r *render) renderTable(node *extAST.Table) error {
 				colIndex++
 				return ast.WalkSkipChildren, nil
 			default:
-				return ast.WalkStop, errors.Errorf("detected unexpected tree type %s", tnode.Kind().String())
+				return ast.WalkStop, fmt.Errorf("detected unexpected tree type %v", tnode.Kind())
 			}
 			return ast.WalkContinue, nil
 		}); err != nil {
