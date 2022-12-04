@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/Kunde21/markdownfmt/v2/markdownfmt"
 	"github.com/google/go-cmp/cmp"
+	"github.com/yuin/goldmark/text"
 )
 
 func TestSame(t *testing.T) {
@@ -139,6 +141,48 @@ func TestCustomCodeFormatter(t *testing.T) {
 
 	if want := " replaced contents\n"; !bytes.Contains(output, []byte(want)) {
 		t.Errorf("output does not contain %q:\n%s", want, output)
+	}
+}
+
+func BenchmarkRender(b *testing.B) {
+	inputs, err := filepath.Glob("testfiles/*.input.md")
+	if err != nil {
+		b.Fatal(err)
+	}
+	sames, err := filepath.Glob("testfiles/*.same.md")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	matches := append(inputs, sames...)
+	sort.Strings(matches)
+
+	for _, fname := range matches {
+		b.Run(filepath.Base(fname), func(b *testing.B) {
+			src, err := os.ReadFile(fname)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			md := markdownfmt.NewGoldmark(
+				// Disable code formatters.
+				// We're not benchmarking gofmt.
+				markdown.WithCodeFormatters(),
+			)
+			doc := md.Parser().Parse(text.NewReader(src))
+			renderer := md.Renderer()
+
+			var buff bytes.Buffer
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				buff.Reset()
+
+				if err := renderer.Render(&buff, src, doc); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
