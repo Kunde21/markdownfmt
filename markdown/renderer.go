@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"io"
+	"strconv"
 	"unicode/utf8"
 	"unsafe"
 
@@ -489,7 +490,7 @@ func listItemMarkerChars(tnode *ast.ListItem) []byte {
 			cnt++
 			s = s.PreviousSibling()
 		}
-		return []byte(fmt.Sprintf("%d%c ", cnt, parList.Marker))
+		return append(strconv.AppendInt(nil, int64(cnt), 10), parList.Marker, ' ')
 	}
 	return []byte{parList.Marker, spaceChar[0]}
 }
