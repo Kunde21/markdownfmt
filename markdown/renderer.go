@@ -110,21 +110,43 @@ type CodeFormatter struct {
 	Format func([]byte) []byte
 }
 
+// GoCodeFormatter is a [CodeFormatter] that reformats Go source code inside
+// fenced code blocks tagged with 'go' or 'Go'.
+//
+//	```go
+//	func main() {
+//	}
+//	```
+//
+// Supply it to the renderer with [WithCodeFormatters].
+var GoCodeFormatter = CodeFormatter{
+	Name:    "go",
+	Aliases: []string{"Go"},
+	Format:  formatGo,
+}
+
+func formatGo(src []byte) []byte {
+	gofmt, err := format.Source(src)
+	if err != nil {
+		// We don't handle gofmt errors.
+		// If code is not compilable we just
+		// don't format it without any warning.
+		return src
+	}
+	return gofmt
+}
+
 // WithCodeFormatters changes the functions used to reformat code blocks found
 // in the original file.
 //
-//	formatters := DefaultCodeFormatters()
-//	formatters = append(formatters, ...)
-//
+//	formatters := []markdown.CodeFormatter{
+//		markdown.GoCodeFormatter,
+//		// ...
+//	}
 //	r := NewRenderer()
-//	r.AddMarkdownOptions(WithCodeFormatters(formatters))
+//	r.AddMarkdownOptions(WithCodeFormatters(formatters...))
 //
-// Pass an empty list to disable code formatting.
-//
-//	r := NewRenderer()
-//	r.AddMarkdownOptions(WithCodeFormatters())
-//
-// Defaults to DefaultCodeFormatters.
+// Defaults to empty.
 func WithCodeFormatters(fs ...CodeFormatter) Option {
 	return func(r *Renderer) {
 		formatters := make(map[string]func([]byte) []byte, len(fs))
@@ -135,29 +157,6 @@ func WithCodeFormatters(fs ...CodeFormatter) Option {
 			}
 		}
 		r.formatters = formatters
-	}
-}
-
-// DefaultCodeFormatters reports the list of default code formatters
-// used by the system.
-//
-// Replace this with WithCodeFormatters.
-func DefaultCodeFormatters() []CodeFormatter {
-	return []CodeFormatter{
-		{
-			Name:    "go",
-			Aliases: []string{"Go"},
-			Format: func(src []byte) []byte {
-				gofmt, err := format.Source(src)
-				if err != nil {
-					// We don't handle gofmt errors.
-					// If code is not compilable we just
-					// don't format it without any warning.
-					return src
-				}
-				return gofmt
-			},
-		},
 	}
 }
 
@@ -175,14 +174,12 @@ func DefaultCodeFormatters() []CodeFormatter {
 //
 // Use [Renderer.AddMarkdownOptions] to customize the output of the renderer.
 func NewRenderer() *Renderer {
-	r := &Renderer{
+	return &Renderer{
 		emphToken: []byte{'*'},
 		// Leave strongToken as nil by default.
 		// At render time, we'll use what was specified,
 		// or repeat emphToken twice to get the strong token.
 	}
-	r.AddMarkdownOptions(WithCodeFormatters(DefaultCodeFormatters()...))
-	return r
 }
 
 // render represents a single markdown rendering operation.

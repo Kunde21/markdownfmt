@@ -122,6 +122,38 @@ func TestDifferent(t *testing.T) {
 	}
 }
 
+func TestGoCodeFormatter(t *testing.T) {
+	matches, err := filepath.Glob("testfiles/*.gofmt-input.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range matches {
+		t.Run(f, func(t *testing.T) {
+			input, err := os.ReadFile(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			expOutput, err := os.ReadFile(strings.ReplaceAll(f, ".gofmt-input.md", ".gofmt-output.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			output, err := markdownfmt.Process("", input, markdown.WithCodeFormatters(markdown.GoCodeFormatter))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			diff := diff(expOutput, output)
+			if len(diff) != 0 {
+				fmt.Println("----\n", string(output), "\n---")
+
+				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
+			}
+		})
+	}
+}
+
 func TestCustomCodeFormatter(t *testing.T) {
 	reference, err := os.ReadFile("testfiles/nested-code.same.md")
 	if err != nil {

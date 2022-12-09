@@ -10,29 +10,54 @@ import (
 )
 
 func TestStdinStdout(t *testing.T) {
-	const (
-		input  = "# hello\nworld"
-		output = "# hello\n\nworld\n"
-	)
-
-	var stdout, stderr bytes.Buffer
-	cmd := mainCmd{
-		Stdin:  strings.NewReader(input),
-		Stdout: &stdout,
-		Stderr: &stderr,
+	tests := []struct {
+		desc       string
+		args       []string
+		stdin      string
+		wantStdout string
+	}{
+		{
+			desc:       "simple",
+			stdin:      "# hello\nworld",
+			wantStdout: "# hello\n\nworld\n",
+		},
+		{
+			desc:       "go code/no gofmt",
+			stdin:      "```go\nfunc main(){fmt.Println(42)\n}\n```",
+			wantStdout: "```go\nfunc main(){fmt.Println(42)\n}\n```\n",
+		},
+		{
+			// The code formatters feature is tested fully elsewhere.
+			// This is just to verify that the '-gofmt' flag
+			// has the desired effect.
+			desc:       "go code/gofmt",
+			args:       []string{"-gofmt"},
+			stdin:      "```go\nfunc main(){fmt.Println(42)\n}\n```",
+			wantStdout: "```go\nfunc main() {\n\tfmt.Println(42)\n}\n```\n",
+		},
 	}
-	cmd.Run(nil /* args */)
-	if want, got := 0, cmd.exitCode; want != got {
-		t.Fatalf("unexpected exit code %v, want %v", got, want)
-	}
 
-	if stderr.Len() > 0 {
-		t.Errorf("unexpected stderr: %v", stderr.String())
-	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			cmd := mainCmd{
+				Stdin:  strings.NewReader(tt.stdin),
+				Stdout: &stdout,
+				Stderr: &stderr,
+			}
+			cmd.Run(tt.args)
+			if want, got := 0, cmd.exitCode; want != got {
+				t.Fatalf("unexpected exit code %v, want %v", got, want)
+			}
+			if stderr.Len() > 0 {
+				t.Errorf("unexpected stderr: %v", stderr.String())
+			}
 
-	gotOutput := stdout.String()
-	if diff := cmp.Diff(output, gotOutput); len(diff) > 0 {
-		t.Errorf("unexpected output %q, want %q\ndiff: %v", gotOutput, output, diff)
+			gotOutput := stdout.String()
+			if diff := cmp.Diff(tt.wantStdout, gotOutput); len(diff) > 0 {
+				t.Errorf("unexpected output %q, want %q\ndiff: %v", gotOutput, tt.wantStdout, diff)
+			}
+		})
 	}
 }
 
@@ -84,6 +109,7 @@ func TestParseArgs(t *testing.T) {
 		diff              bool
 		underlineHeadings bool
 		softWraps         bool
+		gofmt             bool
 	}
 
 	tests := []struct {
@@ -121,6 +147,11 @@ func TestParseArgs(t *testing.T) {
 			desc: "softWraps",
 			give: []string{"-soft-wraps"},
 			want: flags{softWraps: true},
+		},
+		{
+			desc: "gofmt",
+			give: []string{"-gofmt"},
+			want: flags{gofmt: true},
 		},
 		{
 			desc:     "file name with flags",
@@ -170,6 +201,9 @@ func TestParseArgs(t *testing.T) {
 			}
 			if want, got := tt.want.softWraps, cmd.softWraps; want != got {
 				t.Errorf("incorrect %v: %v, want %v", "softWraps", want, got)
+			}
+			if want, got := tt.want.gofmt, cmd.gofmt; want != got {
+				t.Errorf("incorrect %v: %v, want %v", "gofmt", want, got)
 			}
 			if diff := cmp.Diff(tt.wantArgs, gotArgs); len(diff) > 0 {
 				t.Errorf("incorrect args: %q, want %q\ndiff: %v", gotArgs, tt.wantArgs, diff)
