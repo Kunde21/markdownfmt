@@ -255,12 +255,7 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 	case *ast.Text:
 		if entering {
 			text := tnode.Segment.Value(r.source)
-			clean := cleanWithoutTrim(text)
-			if len(clean) == 0 {
-				// Nothing to render.
-				break
-			}
-			_, _ = r.w.Write(clean)
+			_ = writeClean(r.w, text)
 			break
 		}
 
@@ -503,19 +498,48 @@ func noAllocString(buf []byte) string {
 	return *(*string)(unsafe.Pointer(&buf))
 }
 
-// cleanWithoutTrim is like clean, but doesn't trim blanks.
-func cleanWithoutTrim(b []byte) []byte {
-	var ret []byte
-	var p byte
-	for i := 0; i < len(b); i++ {
-		q := b[i]
+// writeClean writes the given byte slice to the writer
+// replacing consecutive spaces, newlines, and tabs
+// with single spaces.
+func writeClean(w io.Writer, bs []byte) error {
+	// This works by scanning the byte slice,
+	// and writing sub-slices of bs
+	// as we see and skip blank sections.
+
+	var (
+		// Start of the current sub-slice to be written.
+		startIdx int
+		// Normalized last character we saw:
+		// for whitespace, this is ' ',
+		// for everything else, it's left as-is.
+		p byte
+	)
+
+	for idx, q := range bs {
 		if q == '\n' || q == '\r' || q == '\t' {
 			q = ' '
 		}
-		if q != ' ' || p != ' ' {
-			ret = append(ret, q)
-			p = q
+
+		if q == ' ' {
+			if p != ' ' {
+				// Going from non-blank to blank.
+				// Write the current sub-slice and the blank.
+				if _, err := w.Write(bs[startIdx:idx]); err != nil {
+					return err
+				}
+				if _, err := w.Write(spaceChar); err != nil {
+					return err
+				}
+			}
+			startIdx = idx + 1
+		} else if p == ' ' {
+			// Going from blank to non-blank.
+			// Start a new sub-slice.
+			startIdx = idx
 		}
+		p = q
 	}
-	return ret
+
+	_, err := w.Write(bs[startIdx:])
+	return err
 }
