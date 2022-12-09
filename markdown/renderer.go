@@ -426,21 +426,28 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 
 		_, _ = r.w.Write(thematicBreakChars)
 	case *ast.Blockquote:
-		r.w.UpdateIndent(tnode, entering)
-
-		if entering && node.Parent() != nil && node.Parent().Kind() == ast.KindListItem &&
-			node.PreviousSibling() == nil {
-			_, _ = r.w.Write(blockquoteChars)
+		if entering {
+			r.w.PushIndent(blockquoteChars)
+			if node.Parent() != nil && node.Parent().Kind() == ast.KindListItem &&
+				node.PreviousSibling() == nil {
+				_, _ = r.w.Write(blockquoteChars)
+			}
+		} else {
+			r.w.PopIndent()
 		}
 
 	case *ast.ListItem:
 		if entering {
-			_, _ = r.w.Write(listItemMarkerChars(tnode))
-		} else if tnode.NextSibling() != nil && tnode.NextSibling().Kind() == ast.KindListItem {
-			// Newline after list item.
-			_, _ = r.w.Write(newLineChar)
+			liMarker := listItemMarkerChars(tnode)
+			_, _ = r.w.Write(liMarker)
+			r.w.PushIndent(bytes.Repeat(spaceChar, len(liMarker)))
+		} else {
+			if tnode.NextSibling() != nil && tnode.NextSibling().Kind() == ast.KindListItem {
+				// Newline after list item.
+				_, _ = r.w.Write(newLineChar)
+			}
+			r.w.PopIndent()
 		}
-		r.w.UpdateIndent(tnode, entering)
 
 	case *extAST.Table:
 		if !entering {
