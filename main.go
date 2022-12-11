@@ -23,13 +23,11 @@ var (
 	doDiff            = flag.Bool("d", false, "display diffs instead of rewriting files")
 	underlineHeadings = flag.Bool("u", false, "write underline headings instead of hashes for levels 1 and 2")
 	softWraps         = flag.Bool("soft-wraps", false, "wrap lines even on soft line breaks")
-
-	exitCode = 0
 )
 
-func report(err error) {
-	scanner.PrintError(os.Stderr, err)
-	exitCode = 2
+func (cmd *mainCmd) report(err error) {
+	scanner.PrintError(cmd.Stderr, err)
+	cmd.exitCode = 2
 }
 
 func usage() {
@@ -43,7 +41,7 @@ func isMarkdownFile(f os.FileInfo) bool {
 	return !f.IsDir() && !strings.HasPrefix(name, ".") && (strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown"))
 }
 
-func processFile(filename string, in io.Reader, out io.Writer) error {
+func (cmd *mainCmd) processFile(filename string, in io.Reader, out io.Writer) error {
 	if in == nil {
 		f, err := os.Open(filename)
 		if err != nil {
@@ -82,7 +80,7 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 			}
 		}
 		if *doDiff {
-			fmt.Fprintf(os.Stderr, "diff %s markdownfmt/%s\n", filename, filename)
+			fmt.Fprintf(cmd.Stderr, "diff %s markdownfmt/%s\n", filename, filename)
 			err = diff.Text(
 				filepath.Join("a", filename),
 				filepath.Join("b", filename),
@@ -101,35 +99,48 @@ func processFile(filename string, in io.Reader, out io.Writer) error {
 	return err
 }
 
-func visitFile(path string, f os.FileInfo, err error) error {
+func (cmd *mainCmd) visitFile(path string, f os.FileInfo, err error) error {
 	if err == nil && isMarkdownFile(f) {
-		err = processFile(path, nil, os.Stdout)
+		err = cmd.processFile(path, nil, cmd.Stdout)
 	}
 	if err != nil {
-		report(err)
+		cmd.report(err)
 	}
 	return nil
 }
 
-func walkDir(path string) error {
-	return filepath.Walk(path, visitFile)
+func (cmd *mainCmd) walkDir(path string) error {
+	return filepath.Walk(path, cmd.visitFile)
 }
 
 func main() {
-	// call markdownfmtMain in a separate function
+	cmd := mainCmd{
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+	// put core logic in a separate function
 	// so that it can use defer and have them
 	// run before the exit.
-	markdownfmtMain()
-	os.Exit(exitCode)
+	cmd.Run(os.Args[1:])
+	os.Exit(cmd.exitCode)
 }
 
-func markdownfmtMain() {
+type mainCmd struct {
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+
+	exitCode int
+}
+
+func (cmd *mainCmd) Run(args []string) {
 	flag.Usage = usage
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 
 	if flag.NArg() == 0 {
-		if err := processFile("<standard input>", os.Stdin, os.Stdout); err != nil {
-			report(err)
+		if err := cmd.processFile("<standard input>", cmd.Stdin, cmd.Stdout); err != nil {
+			cmd.report(err)
 		}
 		return
 	}
@@ -138,14 +149,14 @@ func markdownfmtMain() {
 		path := flag.Arg(i)
 		switch dir, err := os.Stat(path); {
 		case err != nil:
-			report(err)
+			cmd.report(err)
 		case dir.IsDir():
-			if err := walkDir(path); err != nil {
-				report(err)
+			if err := cmd.walkDir(path); err != nil {
+				cmd.report(err)
 			}
 		default:
-			if err := processFile(path, nil, os.Stdout); err != nil {
-				report(err)
+			if err := cmd.processFile(path, nil, cmd.Stdout); err != nil {
+				cmd.report(err)
 			}
 		}
 	}
