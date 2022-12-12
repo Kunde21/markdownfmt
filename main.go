@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/scanner"
@@ -16,23 +17,17 @@ import (
 	"github.com/pkg/diff"
 )
 
-var (
-	// Main operation modes.
-	list              = flag.Bool("l", false, "list files whose formatting differs from markdownfmt's")
-	write             = flag.Bool("w", false, "write result to (source) file instead of stdout")
-	doDiff            = flag.Bool("d", false, "display diffs instead of rewriting files")
-	underlineHeadings = flag.Bool("u", false, "write underline headings instead of hashes for levels 1 and 2")
-	softWraps         = flag.Bool("soft-wraps", false, "wrap lines even on soft line breaks")
-)
+func (cmd *mainCmd) registerFlags(flag *flag.FlagSet) {
+	flag.BoolVar(&cmd.list, "l", false, "list files whose formatting differs from markdownfmt's")
+	flag.BoolVar(&cmd.write, "w", false, "write result to (source) file instead of stdout")
+	flag.BoolVar(&cmd.diff, "d", false, "display diffs instead of rewriting files")
+	flag.BoolVar(&cmd.underlineHeadings, "u", false, "write underline headings instead of hashes for levels 1 and 2")
+	flag.BoolVar(&cmd.softWraps, "soft-wraps", false, "wrap lines even on soft line breaks")
+}
 
 func (cmd *mainCmd) report(err error) {
 	scanner.PrintError(cmd.Stderr, err)
 	cmd.exitCode = 2
-}
-
-func usage() {
-	fmt.Fprintf(os.Stderr, "usage: markdownfmt [flags] [path ...]\n")
-	flag.PrintDefaults()
 }
 
 func isMarkdownFile(f os.FileInfo) bool {
@@ -57,10 +52,10 @@ func (cmd *mainCmd) processFile(filename string, in io.Reader, out io.Writer) er
 	}
 
 	var opts []markdown.Option
-	if *underlineHeadings {
+	if cmd.underlineHeadings {
 		opts = append(opts, markdown.WithUnderlineHeadings())
 	}
-	if *softWraps {
+	if cmd.softWraps {
 		opts = append(opts, markdown.WithSoftWraps())
 	}
 	res, err := markdownfmt.Process(filename, src, opts...)
@@ -70,16 +65,16 @@ func (cmd *mainCmd) processFile(filename string, in io.Reader, out io.Writer) er
 
 	if !bytes.Equal(src, res) {
 		// formatting has changed
-		if *list {
+		if cmd.list {
 			fmt.Fprintln(out, filename)
 		}
-		if *write {
+		if cmd.write {
 			err = os.WriteFile(filename, res, 0)
 			if err != nil {
 				return err
 			}
 		}
-		if *doDiff {
+		if cmd.diff {
 			fmt.Fprintf(cmd.Stderr, "diff %s markdownfmt/%s\n", filename, filename)
 			err = diff.Text(
 				filepath.Join("a", filename),
@@ -92,7 +87,7 @@ func (cmd *mainCmd) processFile(filename string, in io.Reader, out io.Writer) er
 		}
 	}
 
-	if !*list && !*write && !*doDiff {
+	if !cmd.list && !cmd.write && !cmd.diff {
 		_, err = out.Write(res)
 	}
 
@@ -132,21 +127,49 @@ type mainCmd struct {
 	Stderr io.Writer
 
 	exitCode int
+
+	// Command line flags:
+
+	// Main operation modes.
+	list  bool
+	write bool
+	diff  bool
+
+	// Output manipulation.
+	underlineHeadings bool
+	softWraps         bool
+}
+
+func (cmd *mainCmd) parseArgs(args []string) ([]string, error) {
+	flag := flag.NewFlagSet("markdownfmt", flag.ContinueOnError)
+	flag.SetOutput(cmd.Stderr)
+	flag.Usage = func() {
+		fmt.Fprintln(cmd.Stderr, "usage: markdownfmt [flags] [path ...]")
+		flag.PrintDefaults()
+	}
+	cmd.registerFlags(flag)
+	err := flag.Parse(args)
+	return flag.Args(), err
 }
 
 func (cmd *mainCmd) Run(args []string) {
-	flag.Usage = usage
-	flag.CommandLine.Parse(args)
+	args, err := cmd.parseArgs(args)
+	if err != nil {
+		// --help exits with a 0 status code.
+		if !errors.Is(err, flag.ErrHelp) {
+			cmd.exitCode = 2
+		}
+		return
+	}
 
-	if flag.NArg() == 0 {
+	if len(args) == 0 {
 		if err := cmd.processFile("<standard input>", cmd.Stdin, cmd.Stdout); err != nil {
 			cmd.report(err)
 		}
 		return
 	}
 
-	for i := 0; i < flag.NArg(); i++ {
-		path := flag.Arg(i)
+	for _, path := range args {
 		switch dir, err := os.Stat(path); {
 		case err != nil:
 			cmd.report(err)
