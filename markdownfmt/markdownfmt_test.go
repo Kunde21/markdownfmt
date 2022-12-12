@@ -16,7 +16,7 @@ import (
 )
 
 func TestSame(t *testing.T) {
-	matches, err := filepath.Glob("testfiles/*.same.md")
+	matches, err := filepath.Glob("testdata/*.same.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestSame(t *testing.T) {
 }
 
 func TestWithHardWraps(t *testing.T) {
-	matches, err := filepath.Glob("testfiles/*same-softwrap.md")
+	matches, err := filepath.Glob("testdata/*same-softwrap.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestWithHardWraps(t *testing.T) {
 }
 
 func TestSameUnderline(t *testing.T) {
-	matches, err := filepath.Glob("testfiles/*.same-underline.md")
+	matches, err := filepath.Glob("testdata/*.same-underline.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestSameUnderline(t *testing.T) {
 }
 
 func TestDifferent(t *testing.T) {
-	matches, err := filepath.Glob("testfiles/*.input.md")
+	matches, err := filepath.Glob("testdata/*.input.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestDifferent(t *testing.T) {
 }
 
 func TestGoCodeFormatter(t *testing.T) {
-	matches, err := filepath.Glob("testfiles/*.gofmt-input.md")
+	matches, err := filepath.Glob("testdata/*.gofmt-input.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestGoCodeFormatter(t *testing.T) {
 }
 
 func TestCustomCodeFormatter(t *testing.T) {
-	reference, err := os.ReadFile("testfiles/nested-code.same.md")
+	reference, err := os.ReadFile("testdata/nested-code.same.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,11 +177,11 @@ func TestCustomCodeFormatter(t *testing.T) {
 }
 
 func BenchmarkRender(b *testing.B) {
-	inputs, err := filepath.Glob("testfiles/*.input.md")
+	inputs, err := filepath.Glob("testdata/*.input.md")
 	if err != nil {
 		b.Fatal(err)
 	}
-	sames, err := filepath.Glob("testfiles/*.same.md")
+	sames, err := filepath.Glob("testdata/*.same.md")
 	if err != nil {
 		b.Fatal(err)
 	}
