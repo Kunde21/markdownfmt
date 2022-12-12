@@ -9,11 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 - Support raw HTML blocks.
 - Add `WithSoftWraps` to retain soft line breaks.
-- Add `WithCodeFormatters` to supply custom formatters for code blocks.
+- Add `WithCodeFormatters` to supply custom formatters for code blocks, and a `GoCodeFormatter` built-in formatter.
 - Add `WithEmphasisToken` and `WithStrongToken` to change the tokens used for bold and italic text.
+- `markdownfmt` CLI: Add `-gofmt` flag to enable reformatting of Go source code.
 
 ### Changed
-- The `markdownfmt` CLI no longer shells out to `diff`.
+- Don't modify code inside fenced code by default. Supply the `WithCodeFormatters` option to the `Renderer` to enable reformatting of source code.
+- `markdownfmt` CLI: Don't shell out to `diff` in `-d` mode.
+- `markdownfmt` CLI: Don't reformat Go source code inside fenced code blocks. Opt into this functionality with the `-gofmt` flag.
 
 ### Fixed
 - Fix formatting of whitespace in code blocks.

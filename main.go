@@ -23,6 +23,7 @@ func (cmd *mainCmd) registerFlags(flag *flag.FlagSet) {
 	flag.BoolVar(&cmd.diff, "d", false, "display diffs instead of rewriting files")
 	flag.BoolVar(&cmd.underlineHeadings, "u", false, "write underline headings instead of hashes for levels 1 and 2")
 	flag.BoolVar(&cmd.softWraps, "soft-wraps", false, "wrap lines even on soft line breaks")
+	flag.BoolVar(&cmd.gofmt, "gofmt", false, "reformat Go source inside fenced code blocks")
 }
 
 func (cmd *mainCmd) report(err error) {
@@ -57,6 +58,9 @@ func (cmd *mainCmd) processFile(filename string, in io.Reader, out io.Writer) er
 	}
 	if cmd.softWraps {
 		opts = append(opts, markdown.WithSoftWraps())
+	}
+	if cmd.gofmt {
+		opts = append(opts, markdown.WithCodeFormatters(markdown.GoCodeFormatter))
 	}
 	res, err := markdownfmt.Process(filename, src, opts...)
 	if err != nil {
@@ -138,6 +142,7 @@ type mainCmd struct {
 	// Output manipulation.
 	underlineHeadings bool
 	softWraps         bool
+	gofmt             bool
 }
 
 func (cmd *mainCmd) parseArgs(args []string) ([]string, error) {
