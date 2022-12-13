@@ -15,7 +15,7 @@ markdownfmt is a CLI that reformats Markdown files (like `gofmt` but for Markdow
 ### CLI
 
 ```bash
-go install github.com/Kunde21/markdownfmt/v3@latest
+go install github.com/Kunde21/markdownfmt/v3/cmd/markdownfmt@latest
 ```
 
 ### Library
