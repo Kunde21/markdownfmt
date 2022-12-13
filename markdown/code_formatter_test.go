@@ -3,7 +3,7 @@ package markdown
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFormatGo(t *testing.T) {
@@ -32,9 +32,7 @@ func TestFormatGo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			got := formatGo([]byte(tt.give))
-			if diff := cmp.Diff(tt.want, string(got)); len(diff) > 0 {
-				t.Errorf("formatGo(%q) = %q, want %q\ndiff %v", tt.give, string(got), tt.want, diff)
-			}
+			assert.Equal(t, tt.want, string(got))
 		})
 	}
 }

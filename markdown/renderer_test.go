@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWriteClean(t *testing.T) {
@@ -22,14 +23,8 @@ func TestWriteClean(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.give, func(t *testing.T) {
 			var buff bytes.Buffer
-			if err := writeClean(&buff, []byte(tt.give)); err != nil {
-				t.Fatal(err)
-			}
-
-			got := buff.String()
-			if diff := cmp.Diff(tt.want, got); len(diff) > 0 {
-				t.Errorf("clean(%q) = %q, want %q", tt.give, got, tt.want)
-			}
+			require.NoError(t, writeClean(&buff, []byte(tt.give)))
+			assert.Equal(t, tt.want, buff.String())
 		})
 	}
 }
@@ -47,14 +42,8 @@ func FuzzWriteClean(f *testing.F) {
 		want := string(cleanWithoutTrim([]byte(s)))
 
 		var buff bytes.Buffer
-		if err := writeClean(&buff, []byte(s)); err != nil {
-			t.Fatal(err)
-		}
-		got := buff.String()
-
-		if diff := cmp.Diff(string(want), got); len(diff) > 0 {
-			t.Errorf("clean(%q) = %q, want %q", s, got, want)
-		}
+		require.NoError(t, writeClean(&buff, []byte(s)))
+		assert.Equal(t, want, buff.String())
 	})
 }
 
