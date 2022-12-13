@@ -6,7 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStdinStdout(t *testing.T) {
@@ -46,39 +47,24 @@ func TestStdinStdout(t *testing.T) {
 				Stderr: &stderr,
 			}
 			cmd.Run(tt.args)
-			if want, got := 0, cmd.exitCode; want != got {
-				t.Fatalf("unexpected exit code %v, want %v", got, want)
-			}
-			if stderr.Len() > 0 {
-				t.Errorf("unexpected stderr: %v", stderr.String())
-			}
-
-			gotOutput := stdout.String()
-			if diff := cmp.Diff(tt.wantStdout, gotOutput); len(diff) > 0 {
-				t.Errorf("unexpected output %q, want %q\ndiff: %v", gotOutput, tt.wantStdout, diff)
-			}
+			assert.Zero(t, cmd.exitCode)
+			assert.Empty(t, stderr.String())
+			assert.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}
 }
 
 func TestFileDoesNotExist(t *testing.T) {
-	var stdout, stderr bytes.Buffer
+	var stderr bytes.Buffer
 	cmd := mainCmd{
 		Stdin:  new(bytes.Buffer), // empty stdin
-		Stdout: &stdout,
+		Stdout: io.Discard,
 		Stderr: &stderr,
 	}
 	cmd.Run([]string{"file-does-not-exist.md"})
 
-	if want, got := 2, cmd.exitCode; want != got {
-		t.Errorf("unexpected exit code %v, want %v", got, want)
-	}
-
-	gotStderr := stderr.String()
-	wantStderr := "file-does-not-exist.md: no such file"
-	if !strings.Contains(gotStderr, wantStderr) {
-		t.Errorf("unexpected stderr %q, should contain %q", gotStderr, wantStderr)
-	}
+	assert.Equal(t, 2, cmd.exitCode)
+	assert.Contains(t, stderr.String(), "file-does-not-exist.md: no such file")
 }
 
 func TestHelp(t *testing.T) {
@@ -90,16 +76,8 @@ func TestHelp(t *testing.T) {
 	}
 	cmd.Run([]string{"-h"})
 
-	// Exit code for --help must be zero.
-	if want, got := 0, cmd.exitCode; want != got {
-		t.Errorf("unexpected exit code %v, want %v", got, want)
-	}
-
-	got := stderr.String()
-	want := "markdownfmt [flags] [path"
-	if !strings.Contains(got, want) {
-		t.Errorf("stderr does not contain %q:\n%v", want, got)
-	}
+	assert.Zero(t, cmd.exitCode, "exit code for --help must be zero")
+	assert.Contains(t, stderr.String(), "markdownfmt [flags] [path")
 }
 
 func TestParseArgs(t *testing.T) {
@@ -179,35 +157,16 @@ func TestParseArgs(t *testing.T) {
 			}
 
 			gotArgs, err := cmd.parseArgs(tt.give)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+			assert.Empty(t, stderr.String(), "incorrect stderr")
 
-			if stderr.Len() > 0 {
-				t.Errorf("unexpected stderr: %v", stderr.String())
-			}
-
-			if want, got := tt.want.list, cmd.list; want != got {
-				t.Errorf("incorrect %v: %v, want %v", "list", want, got)
-			}
-			if want, got := tt.want.write, cmd.write; want != got {
-				t.Errorf("incorrect %v: %v, want %v", "write", want, got)
-			}
-			if want, got := tt.want.diff, cmd.diff; want != got {
-				t.Errorf("incorrect %v: %v, want %v", "diff", want, got)
-			}
-			if want, got := tt.want.underlineHeadings, cmd.underlineHeadings; want != got {
-				t.Errorf("incorrect %v: %v, want %v", "underlineHeadings", want, got)
-			}
-			if want, got := tt.want.softWraps, cmd.softWraps; want != got {
-				t.Errorf("incorrect %v: %v, want %v", "softWraps", want, got)
-			}
-			if want, got := tt.want.gofmt, cmd.gofmt; want != got {
-				t.Errorf("incorrect %v: %v, want %v", "gofmt", want, got)
-			}
-			if diff := cmp.Diff(tt.wantArgs, gotArgs); len(diff) > 0 {
-				t.Errorf("incorrect args: %q, want %q\ndiff: %v", gotArgs, tt.wantArgs, diff)
-			}
+			assert.Equal(t, tt.want.list, cmd.list, "list")
+			assert.Equal(t, tt.want.write, cmd.write, "write")
+			assert.Equal(t, tt.want.diff, cmd.diff, "diff")
+			assert.Equal(t, tt.want.underlineHeadings, cmd.underlineHeadings, "underlineHeadings")
+			assert.Equal(t, tt.want.softWraps, cmd.softWraps, "softWraps")
+			assert.Equal(t, tt.want.gofmt, cmd.gofmt, "gofmt")
+			assert.Equal(t, tt.wantArgs, gotArgs, "args")
 		})
 	}
 }
@@ -221,13 +180,6 @@ func TestParseArgs_UnknownFlag(t *testing.T) {
 	}
 
 	_, err := cmd.parseArgs([]string{"-unknown-flag"})
-	if err == nil {
-		t.Fatal("Expected failure")
-	}
-
-	got := stderr.String()
-	want := "flag provided but not defined: -unknown-flag"
-	if !strings.Contains(got, want) {
-		t.Errorf("error does not contain %q:\n%v", want, got)
-	}
+	require.Error(t, err)
+	assert.Contains(t, stderr.String(), "flag provided but not defined: -unknown-flag")
 }

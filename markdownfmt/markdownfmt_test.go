@@ -2,7 +2,6 @@ package markdownfmt_test
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,154 +10,105 @@ import (
 
 	"github.com/Kunde21/markdownfmt/v2/markdown"
 	"github.com/Kunde21/markdownfmt/v2/markdownfmt"
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yuin/goldmark/text"
 )
 
 func TestSame(t *testing.T) {
 	matches, err := filepath.Glob("testdata/*.same.md")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
 			reference, err := os.ReadFile(f)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			output, err := markdownfmt.Process("", reference)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
-			diff := diff(reference, output)
-			if diff != "" {
-				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
-			}
+			assert.Equal(t, string(reference), string(output))
 		})
 	}
 }
 
 func TestWithHardWraps(t *testing.T) {
 	matches, err := filepath.Glob("testdata/*same-softwrap.md")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
 			reference, err := os.ReadFile(f)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			output, err := markdownfmt.Process("", reference, markdown.WithSoftWraps())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
-			diff := diff(reference, output)
-			if len(diff) != 0 {
-				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
-			}
+			assert.Equal(t, string(reference), string(output))
 		})
 	}
 }
 
 func TestSameUnderline(t *testing.T) {
 	matches, err := filepath.Glob("testdata/*.same-underline.md")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
 			reference, err := os.ReadFile(f)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			output, err := markdownfmt.Process("", reference, markdown.WithUnderlineHeadings())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
-			diff := diff(reference, output)
-			if len(diff) != 0 {
-				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
-			}
+			assert.Equal(t, string(reference), string(output))
 		})
 	}
 }
 
 func TestDifferent(t *testing.T) {
 	matches, err := filepath.Glob("testdata/*.input.md")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
 			input, err := os.ReadFile(f)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			expOutput, err := os.ReadFile(strings.ReplaceAll(f, ".input.md", ".output.md"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			output, err := markdownfmt.Process("", input)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
-			diff := diff(expOutput, output)
-			if len(diff) != 0 {
-				fmt.Println("----\n", string(output), "\n---")
-
-				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
-			}
+			assert.Equal(t, string(expOutput), string(output))
 		})
 	}
 }
 
 func TestGoCodeFormatter(t *testing.T) {
 	matches, err := filepath.Glob("testdata/*.gofmt-input.md")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	for _, f := range matches {
 		t.Run(f, func(t *testing.T) {
 			input, err := os.ReadFile(f)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			expOutput, err := os.ReadFile(strings.ReplaceAll(f, ".gofmt-input.md", ".gofmt-output.md"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			output, err := markdownfmt.Process("", input, markdown.WithCodeFormatters(markdown.GoCodeFormatter))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
-			diff := diff(expOutput, output)
-			if len(diff) != 0 {
-				fmt.Println("----\n", string(output), "\n---")
-
-				t.Errorf("Difference in %s of %d lines:\n%s", f, strings.Count(diff, "\n"), diff)
-			}
+			assert.Equal(t, string(expOutput), string(output))
 		})
 	}
 }
 
 func TestCustomCodeFormatter(t *testing.T) {
 	reference, err := os.ReadFile("testdata/nested-code.same.md")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	output, err := markdownfmt.Process(
 		"", reference, markdown.WithCodeFormatters(markdown.CodeFormatter{
@@ -167,24 +117,17 @@ func TestCustomCodeFormatter(t *testing.T) {
 				return []byte("replaced contents")
 			},
 		}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if want := " replaced contents\n"; !bytes.Contains(output, []byte(want)) {
-		t.Errorf("output does not contain %q:\n%s", want, output)
-	}
+	assert.Contains(t, string(output), " replaced contents\n")
 }
 
 func BenchmarkRender(b *testing.B) {
 	inputs, err := filepath.Glob("testdata/*.input.md")
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(b, err)
+
 	sames, err := filepath.Glob("testdata/*.same.md")
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(b, err)
 
 	matches := append(inputs, sames...)
 	sort.Strings(matches)
@@ -192,9 +135,7 @@ func BenchmarkRender(b *testing.B) {
 	for _, fname := range matches {
 		b.Run(filepath.Base(fname), func(b *testing.B) {
 			src, err := os.ReadFile(fname)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			md := markdownfmt.NewGoldmark(
 				// Disable code formatters.
@@ -210,14 +151,9 @@ func BenchmarkRender(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				buff.Reset()
 
-				if err := renderer.Render(&buff, src, doc); err != nil {
-					b.Fatal(err)
-				}
+				err := renderer.Render(&buff, src, doc)
+				require.NoError(b, err)
 			}
 		})
 	}
-}
-
-func diff(want, got []byte) string {
-	return cmp.Diff(string(want), string(got))
 }

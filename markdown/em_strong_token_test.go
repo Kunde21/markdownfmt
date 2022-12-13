@@ -5,7 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/text"
 )
@@ -85,22 +86,18 @@ func TestEmphasisAndStrongToken(t *testing.T) {
 		},
 	}
 
-	runTestCase := func(renderer *Renderer, tc testCase) {
+	runTestCase := func(t *testing.T, renderer *Renderer, tc testCase) {
 		src := []byte(tc.give)
 		node := goldmark.DefaultParser().Parse(text.NewReader(src))
 		var buff bytes.Buffer
-		if err := renderer.Render(&buff, src, node); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, renderer.Render(&buff, src, node))
 
 		// We omit the trailing newline from test cases for
 		// convenience.
 		want := strings.TrimSuffix(tc.want, "\n")
 		got := strings.TrimSuffix(buff.String(), "\n")
 
-		if diff := cmp.Diff(want, got); len(diff) > 0 {
-			t.Error(diff)
-		}
+		assert.Equal(t, want, got)
 	}
 
 	for _, tt := range tests {
@@ -115,7 +112,7 @@ func TestEmphasisAndStrongToken(t *testing.T) {
 
 			for _, tc := range tt.cases {
 				t.Run(tc.give, func(t *testing.T) {
-					runTestCase(renderer, tc)
+					runTestCase(t, renderer, tc)
 				})
 			}
 		})
