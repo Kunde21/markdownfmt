@@ -1,6 +1,6 @@
 # markdownfmt
 
-[![Build Status](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml/badge.svg?query=branch%3Amaster)](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml?query=branch%3Amaster) [![Go Reference](https://pkg.go.dev/badge/github.com/Kunde21/markdownfmt/v2.svg)](https://pkg.go.dev/github.com/Kunde21/markdownfmt/v2)
+[![Build Status](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml/badge.svg?query=branch%3Amaster)](https://github.com/Kunde21/markdownfmt/actions/workflows/go.yml?query=branch%3Amaster) [![Go Reference](https://pkg.go.dev/badge/github.com/Kunde21/markdownfmt/v3.svg)](https://pkg.go.dev/github.com/Kunde21/markdownfmt/v3)
 
 markdownfmt is a CLI that reformats Markdown files (like `gofmt` but for Markdown) and a library that you can use to generate well-formed Markdown files.
 
@@ -15,13 +15,13 @@ markdownfmt is a CLI that reformats Markdown files (like `gofmt` but for Markdow
 ### CLI
 
 ```bash
-go install github.com/Kunde21/markdownfmt/v2@latest
+go install github.com/Kunde21/markdownfmt/v3@latest
 ```
 
 ### Library
 
 ```bash
-go get github.com/Kunde21/markdownfmt/v2@latest
+go get github.com/Kunde21/markdownfmt/v3@latest
 ```
 
 ## Usage

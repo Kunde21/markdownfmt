@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Kunde21/markdownfmt/v2/markdown"
-	"github.com/Kunde21/markdownfmt/v2/markdownfmt"
+	"github.com/Kunde21/markdownfmt/v3/markdown"
+	"github.com/Kunde21/markdownfmt/v3/markdownfmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yuin/goldmark/text"
