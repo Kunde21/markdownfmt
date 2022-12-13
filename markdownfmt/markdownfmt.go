@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"os"
 
-	"github.com/Kunde21/markdownfmt/v2/markdown"
+	"github.com/Kunde21/markdownfmt/v3/markdown"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
