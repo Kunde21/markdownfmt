@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Kunde21/markdownfmt/v3"
 	"github.com/Kunde21/markdownfmt/v3/markdown"
-	"github.com/Kunde21/markdownfmt/v3/markdownfmt"
 	"github.com/pkg/diff"
 )
 

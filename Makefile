@@ -73,4 +73,4 @@ check-mdfmt: $(MARKDOWNFMT)
 	fi
 
 $(MARKDOWNFMT): $(SRC_FILES)
-	go build -o $@
+	go build -o $@ ./cmd/markdownfmt
