@@ -10,12 +10,6 @@ import (
 	"github.com/yuin/goldmark/parser"
 )
 
-// NewParser builds a new goldmark parser
-// capable of generating ASTs that markdownfmt can render.
-func NewParser() parser.Parser {
-	return NewGoldmark().Parser()
-}
-
 // NewGoldmark builds a new [goldmark.Markdown] object
 // capable of reformatting GitHub Formatted Markdown.
 func NewGoldmark(opts ...markdown.Option) goldmark.Markdown {
