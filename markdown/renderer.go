@@ -43,35 +43,53 @@ type Renderer struct {
 	formatters map[string]func([]byte) []byte
 }
 
-// AddOptions does not do anything.
-// You probably want to use [Renderer.AddMarkdownOptions].
-func (mr *Renderer) AddOptions(...renderer.Option) {
-	// goldmark weirdness, just ignore (called with just HTML options...)
+// AddOptions pulls Markdown renderer specific options from the given list,
+// and applies them to the renderer.
+func (mr *Renderer) AddOptions(opts ...renderer.Option) {
+	mdopts := make([]Option, 0, len(opts))
+	for _, o := range opts {
+		if mo, ok := o.(Option); ok {
+			mdopts = append(mdopts, mo)
+		}
+	}
+	mr.AddMarkdownOptions(mdopts...)
 }
 
 // AddMarkdownOptions modifies the Renderer with the given options.
 func (mr *Renderer) AddMarkdownOptions(opts ...Option) {
 	for _, o := range opts {
-		o(mr)
+		o.apply(mr)
 	}
 }
 
 // Option customizes the behavior of the markdown renderer.
-type Option func(r *Renderer)
+type Option interface {
+	renderer.Option
+
+	apply(r *Renderer)
+}
+
+type optionFunc func(*Renderer)
+
+func (f optionFunc) SetConfig(*renderer.Config) {}
+
+func (f optionFunc) apply(r *Renderer) {
+	f(r)
+}
 
 // WithUnderlineHeadings configures the renderer to use
 // Setext-style headers (=== and ---).
 func WithUnderlineHeadings() Option {
-	return func(r *Renderer) {
+	return optionFunc(func(r *Renderer) {
 		r.underlineHeadings = true
-	}
+	})
 }
 
 // WithSoftWraps allows you to wrap lines even on soft line breaks.
 func WithSoftWraps() Option {
-	return func(r *Renderer) {
+	return optionFunc(func(r *Renderer) {
 		r.softWraps = true
-	}
+	})
 }
 
 // WithEmphasisToken specifies the character used to wrap emphasised text.
@@ -79,9 +97,9 @@ func WithSoftWraps() Option {
 //
 // Defaults to '*'.
 func WithEmphasisToken(c rune) Option {
-	return func(r *Renderer) {
+	return optionFunc(func(r *Renderer) {
 		r.emphToken = utf8.AppendRune(nil, c)
-	}
+	})
 }
 
 // WithStrongToken specifies the string used to wrap bold text.
@@ -90,9 +108,9 @@ func WithEmphasisToken(c rune) Option {
 // Defaults to repeating the emphasis token twice.
 // See [WithEmphasisToken] for how to change that.
 func WithStrongToken(s string) Option {
-	return func(r *Renderer) {
+	return optionFunc(func(r *Renderer) {
 		r.strongToken = []byte(s)
-	}
+	})
 }
 
 // CodeFormatter reformats code samples found in the document,
@@ -148,7 +166,7 @@ func formatGo(src []byte) []byte {
 //
 // Defaults to empty.
 func WithCodeFormatters(fs ...CodeFormatter) Option {
-	return func(r *Renderer) {
+	return optionFunc(func(r *Renderer) {
 		formatters := make(map[string]func([]byte) []byte, len(fs))
 		for _, f := range fs {
 			formatters[f.Name] = f.Format
@@ -157,7 +175,7 @@ func WithCodeFormatters(fs ...CodeFormatter) Option {
 			}
 		}
 		r.formatters = formatters
-	}
+	})
 }
 
 // NewRenderer builds a new Markdown renderer with default settings.
