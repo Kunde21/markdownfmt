@@ -98,7 +98,9 @@ func WithSoftWraps() Option {
 // Defaults to '*'.
 func WithEmphasisToken(c rune) Option {
 	return optionFunc(func(r *Renderer) {
-		r.emphToken = utf8.AppendRune(nil, c)
+		buf := make([]byte, 4) // enough to encode any utf8 rune
+		n := utf8.EncodeRune(buf, c)
+		r.emphToken = buf[:n]
 	})
 }
 
