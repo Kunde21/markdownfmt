@@ -32,6 +32,8 @@ usage: markdownfmt [flags] [path ...]
   -gofmt
         reformat Go source inside fenced code blocks
   -l    list files whose formatting differs from markdownfmt's
+  -list-indent-style value
+        style for indenting items inside lists ("aligned" or "uniform")
   -soft-wraps
         wrap lines even on soft line breaks
   -u    write underline headings instead of hashes for levels 1 and 2

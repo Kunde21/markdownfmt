@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Kunde21/markdownfmt/v3/markdown"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,6 +36,12 @@ func TestStdinStdout(t *testing.T) {
 			args:       []string{"-gofmt"},
 			stdin:      "```go\nfunc main(){fmt.Println(42)\n}\n```",
 			wantStdout: "```go\nfunc main() {\n\tfmt.Println(42)\n}\n```\n",
+		},
+		{
+			desc:       "list-indent-style",
+			args:       []string{"-list-indent-style", "uniform"},
+			stdin:      "- foo\n  - bar\n- baz\n",
+			wantStdout: "- foo\n    - bar\n- baz\n",
 		},
 	}
 
@@ -88,6 +95,7 @@ func TestParseArgs(t *testing.T) {
 		underlineHeadings bool
 		softWraps         bool
 		gofmt             bool
+		listIndentStyle   markdown.ListIndentStyle
 	}
 
 	tests := []struct {
@@ -132,6 +140,16 @@ func TestParseArgs(t *testing.T) {
 			want: flags{gofmt: true},
 		},
 		{
+			desc: "list indent style/aligned",
+			give: []string{"-list-indent-style=aligned"},
+			want: flags{listIndentStyle: markdown.ListIndentAligned},
+		},
+		{
+			desc: "list indent style/uniform",
+			give: []string{"-list-indent-style=uniform"},
+			want: flags{listIndentStyle: markdown.ListIndentUniform},
+		},
+		{
 			desc:     "file name with flags",
 			give:     []string{"-w", "foo.md", "bar/", "baz.md"},
 			want:     flags{write: true},
@@ -166,6 +184,7 @@ func TestParseArgs(t *testing.T) {
 			assert.Equal(t, tt.want.underlineHeadings, cmd.underlineHeadings, "underlineHeadings")
 			assert.Equal(t, tt.want.softWraps, cmd.softWraps, "softWraps")
 			assert.Equal(t, tt.want.gofmt, cmd.gofmt, "gofmt")
+			assert.Equal(t, tt.want.listIndentStyle, cmd.listIndentStyle, "listIndentStyle")
 			assert.Equal(t, tt.wantArgs, gotArgs, "args")
 		})
 	}
@@ -182,4 +201,18 @@ func TestParseArgs_UnknownFlag(t *testing.T) {
 	_, err := cmd.parseArgs([]string{"-unknown-flag"})
 	require.Error(t, err)
 	assert.Contains(t, stderr.String(), "flag provided but not defined: -unknown-flag")
+}
+
+func TestParseArgs_UnknownListIndentStyle(t *testing.T) {
+	var stderr bytes.Buffer
+	cmd := mainCmd{
+		Stdin:  new(bytes.Buffer), // empty stdin
+		Stdout: io.Discard,
+		Stderr: &stderr,
+	}
+
+	_, err := cmd.parseArgs([]string{"-list-indent-style=whatisthis"})
+	require.Error(t, err)
+	assert.Contains(t, stderr.String(), `invalid value "whatisthis"`)
+	assert.Contains(t, stderr.String(), `unrecognized style "whatisthis"`)
 }
