@@ -17,6 +17,37 @@ import (
 	"github.com/pkg/diff"
 )
 
+type listIndentStyle markdown.ListIndentStyle
+
+var _ flag.Getter = (*listIndentStyle)(nil)
+
+func (s *listIndentStyle) Get() interface{} {
+	return markdown.ListIndentStyle(*s)
+}
+
+func (s *listIndentStyle) String() string {
+	switch markdown.ListIndentStyle(*s) {
+	case markdown.ListIndentAligned:
+		return "aligned"
+	case markdown.ListIndentUniform:
+		return "uniform"
+	default:
+		return "invalid"
+	}
+}
+
+func (s *listIndentStyle) Set(v string) error {
+	switch strings.TrimSpace(strings.ToLower(v)) {
+	case "aligned":
+		*s = listIndentStyle(markdown.ListIndentAligned)
+	case "uniform":
+		*s = listIndentStyle(markdown.ListIndentUniform)
+	default:
+		return fmt.Errorf(`unrecognized style %q: valid values are "aligned" and "uniform"`, v)
+	}
+	return nil
+}
+
 func (cmd *mainCmd) registerFlags(flag *flag.FlagSet) {
 	flag.BoolVar(&cmd.list, "l", false, "list files whose formatting differs from markdownfmt's")
 	flag.BoolVar(&cmd.write, "w", false, "write result to (source) file instead of stdout")
@@ -24,6 +55,7 @@ func (cmd *mainCmd) registerFlags(flag *flag.FlagSet) {
 	flag.BoolVar(&cmd.underlineHeadings, "u", false, "write underline headings instead of hashes for levels 1 and 2")
 	flag.BoolVar(&cmd.softWraps, "soft-wraps", false, "wrap lines even on soft line breaks")
 	flag.BoolVar(&cmd.gofmt, "gofmt", false, "reformat Go source inside fenced code blocks")
+	flag.Var((*listIndentStyle)(&cmd.listIndentStyle), "list-indent-style", `style for indenting items inside lists ("aligned" or "uniform")`)
 }
 
 func (cmd *mainCmd) report(err error) {
@@ -52,7 +84,7 @@ func (cmd *mainCmd) processFile(filename string, in io.Reader, out io.Writer) er
 		return err
 	}
 
-	var opts []markdown.Option
+	opts := []markdown.Option{markdown.WithListIndentStyle(cmd.listIndentStyle)}
 	if cmd.underlineHeadings {
 		opts = append(opts, markdown.WithUnderlineHeadings())
 	}
@@ -143,6 +175,7 @@ type mainCmd struct {
 	underlineHeadings bool
 	softWraps         bool
 	gofmt             bool
+	listIndentStyle   markdown.ListIndentStyle
 }
 
 func (cmd *mainCmd) parseArgs(args []string) ([]string, error) {

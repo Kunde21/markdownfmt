@@ -106,6 +106,60 @@ func TestGoCodeFormatter(t *testing.T) {
 	}
 }
 
+func TestListIndentUniform(t *testing.T) {
+	matches, err := filepath.Glob("testdata/*.list-uniform-input.md")
+	require.NoError(t, err)
+
+	for _, f := range matches {
+		t.Run(f, func(t *testing.T) {
+			input, err := os.ReadFile(f)
+			require.NoError(t, err)
+
+			expOutput, err := os.ReadFile(strings.ReplaceAll(f, ".list-uniform-input.md", ".list-uniform-output.md"))
+			require.NoError(t, err)
+
+			output, err := markdownfmt.Process("", input, markdown.WithListIndentStyle(markdown.ListIndentUniform))
+			require.NoError(t, err)
+
+			assert.Equal(t, string(expOutput), string(output))
+		})
+	}
+}
+
+func TestListIndentUniform_ReparseOutput(t *testing.T) {
+	// This test verifies that there is no change in semantics
+	// between the "aligned" and "uniform" indentation styles.
+	//
+	// To do this,
+	// it processes the uniform inputs with aligned indentation
+	// and compares the output of that with the output of
+	// re-processing the uniform outputs with aligned indentation.
+	//
+	// That is, it verifies:
+	//
+	//	aligned(txt) == aligned(uniform(txt))
+
+	matches, err := filepath.Glob("testdata/*.list-uniform-input.md")
+	require.NoError(t, err)
+
+	for _, inputFile := range matches {
+		t.Run(inputFile, func(t *testing.T) {
+			input, err := os.ReadFile(inputFile)
+			require.NoError(t, err)
+			alignedOutput, err := markdownfmt.Process("", input, markdown.WithListIndentStyle(markdown.ListIndentAligned))
+			require.NoError(t, err)
+
+			outputFile := strings.ReplaceAll(inputFile, ".list-uniform-input.md", ".list-uniform-output.md")
+			uniformOutput, err := os.ReadFile(outputFile)
+			require.NoError(t, err)
+			realignedOutput, err := markdownfmt.Process("", uniformOutput, markdown.WithListIndentStyle(markdown.ListIndentAligned))
+			require.NoError(t, err)
+
+			assert.Equal(t, string(alignedOutput), string(realignedOutput))
+		})
+	}
+}
+
 func TestCustomCodeFormatter(t *testing.T) {
 	reference, err := os.ReadFile("testdata/nested-code.same.md")
 	require.NoError(t, err)

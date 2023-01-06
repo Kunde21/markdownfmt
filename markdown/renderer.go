@@ -26,6 +26,7 @@ var (
 	tableHeaderAlignColChar = []byte{':'}
 	heading1UnderlineChar   = []byte{'='}
 	heading2UnderlineChar   = []byte{'-'}
+	fourSpacesChars         = bytes.Repeat([]byte{' '}, 4)
 )
 
 // Ensure compatibility with Goldmark parser.
@@ -38,6 +39,7 @@ type Renderer struct {
 	softWraps         bool
 	emphToken         []byte
 	strongToken       []byte // if nil, use emphToken*2
+	listIndentStyle   ListIndentStyle
 
 	// language name => format function
 	formatters map[string]func([]byte) []byte
@@ -112,6 +114,66 @@ func WithEmphasisToken(c rune) Option {
 func WithStrongToken(s string) Option {
 	return optionFunc(func(r *Renderer) {
 		r.strongToken = []byte(s)
+	})
+}
+
+// ListIndentStyle specifies how items nested inside lists
+// should be indented.
+type ListIndentStyle int
+
+const (
+	// ListIndentAligned specifies that items inside a list item
+	// should be aligned to the content in the first item.
+	//
+	//	- First paragraph.
+	//
+	//	  Second paragraph aligned with the first.
+	//
+	// This applies to ordered lists too.
+	//
+	//	1. First paragraph.
+	//
+	//	   Second paragraph aligned with the first.
+	//
+	//	...
+	//
+	//	10. Contents.
+	//
+	//	    Long lists indent content further.
+	//
+	// This is the default.
+	ListIndentAligned ListIndentStyle = iota
+
+	// ListIndentUniform specifies that items inside a list item
+	// should be aligned uniformly with 4 spaces.
+	//
+	// For example:
+	//
+	//	- First paragraph.
+	//
+	//	    Second paragraph indented 4 spaces.
+	//
+	// For ordered lists:
+	//
+	//	1. First paragraph.
+	//
+	//	    Second paragraph indented 4 spaces.
+	//
+	//	...
+	//
+	//	10. Contents.
+	//
+	//	    Always indented 4 spaces.
+	ListIndentUniform
+)
+
+// WithListIndentStyle specifies how contents nested under a list item
+// should be indented.
+//
+// Defaults to [ListIndentAligned].
+func WithListIndentStyle(style ListIndentStyle) Option {
+	return optionFunc(func(r *Renderer) {
+		r.listIndentStyle = style
 	})
 }
 
@@ -460,7 +522,21 @@ func (r *render) renderNode(node ast.Node, entering bool) (ast.WalkStatus, error
 		if entering {
 			liMarker := listItemMarkerChars(tnode)
 			_, _ = r.w.Write(liMarker)
-			r.w.PushIndent(bytes.Repeat(spaceChar, len(liMarker)))
+			if r.mr.listIndentStyle == ListIndentUniform &&
+				// We can use 4 spaces for indentation only if
+				// that would still qualify as part of the list
+				// item text. e.g., given "123. foo",
+				// for content to be part of that list item,
+				// it must be indented 5 spaces.
+				//
+				//	123. foo
+				//
+				//	     bar
+				len(liMarker) <= len(fourSpacesChars) {
+				r.w.PushIndent(fourSpacesChars)
+			} else {
+				r.w.PushIndent(bytes.Repeat(spaceChar, len(liMarker)))
+			}
 		} else {
 			if tnode.NextSibling() != nil && tnode.NextSibling().Kind() == ast.KindListItem {
 				// Newline after list item.
